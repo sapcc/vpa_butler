@@ -1,0 +1,22 @@
+resources:
+  - name: vpa_butler.git
+    type: git
+    source:
+      uri: https://github.com/sapcc/vpa_butler.git
+      branch: main
+  - name: vpa_butler.image
+    type: docker-image
+    check_every: 24h
+    source:
+      username: ((auth_from_file.docker.keppel-dhcp-controlplane.user))
+      password: ((auth_from_file.docker.keppel-dhcp-controlplane.password))
+      repository: keppel.eu-de-1.cloud.sap/ccloud/vpa_butler
+      tag: latest
+
+jobs:
+  - name: build-vpa_butler
+    plan:
+      - get: vpa_butler.git
+      - put: vpa_butler.image
+        params:
+          build: .
