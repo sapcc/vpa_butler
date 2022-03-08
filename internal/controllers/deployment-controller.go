@@ -2,10 +2,10 @@ package controllers
 
 import (
 	"context"
+	"fmt"
+
 	"github.com/go-logr/logr"
-	"github.com/sapcc/vpa_butler/internal/common"
 	appsv1 "k8s.io/api/apps/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	vpav1 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -13,93 +13,43 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	"time"
+
+	"github.com/sapcc/vpa_butler/internal/common"
 )
 
 type VPADeploymentController struct {
 	client.Client
-	Log logr.Logger
-	Scheme *runtime.Scheme
-	ReSyncPeriod time.Duration
+	log    logr.Logger
+	scheme *runtime.Scheme
 }
 
-func (v *VPADeploymentController) SetupWithManager (mgr ctrl.Manager) error {
+func (v *VPADeploymentController) SetupWithManager(mgr ctrl.Manager) error {
 	name := "deployment-controller"
 	v.Client = mgr.GetClient()
-	v.Log = mgr.GetLogger().WithName(name)
-	v.Scheme = mgr.GetScheme()
+	v.log = mgr.GetLogger().WithName(name)
+	v.scheme = mgr.GetScheme()
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(name).
-		For( &appsv1.Deployment{}).
+		For(&appsv1.Deployment{}).
 		Watches(&source.Kind{Type: &vpav1.VerticalPodAutoscaler{}}, &handler.EnqueueRequestForObject{}).
-		WithOptions(controller.Options{MaxConcurrentReconciles: 10, Log: v.Log}).
+		WithOptions(controller.Options{MaxConcurrentReconciles: 10, Log: v.log}).
 		Complete(v)
 }
 
 func (v *VPADeploymentController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	found, deploy, err := v.getDeployment(ctx, req)
+	var deploy = new(appsv1.Deployment)
+	if err := v.Get(ctx, req.NamespacedName, deploy); err != nil {
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	result, err := common.ReconcileVPA(ctx, v.Client, v.scheme, deploy)
 	if err != nil {
-		v.Log.Error(err, "error getting deployment")
 		return ctrl.Result{}, err
 	}
-	if ! found {
-		// check for delete
-		vpaFound, vpa, err := v.getVPA(ctx, req)
-		if err != nil {
-			v.Log.Error(err, "error getting vpa")
-			return ctrl.Result{}, err
-		}
-		if vpaFound && vpa.Annotations["managedBy"] == "vpa_butler" && vpa.Annotations["vpa_controller"] == "VPADeploymentController" {
-			v.Log.Info("delete vpa", "namespace", req.Namespace, "vpa", vpa.Name)
-			err = v.Delete(ctx, vpa)
-			if err != nil {
-				v.Log.Error(err, "error deleting vpa")
-				return ctrl.Result{}, err
-			}
-		}
-		return ctrl.Result{}, nil
+	switch result {
+	case common.OperationResultCreated, common.OperationResultUpdated:
+		v.log.Info(fmt.Sprintf("VPA for Deployment was %s", result), "namespace", deploy.Namespace, "name", deploy.Name)
 	}
-	found, _, err = v.getVPA(ctx, req)
-	if err != nil {
-		v.Log.Error(err, "error getting vpa")
-		return ctrl.Result{}, err
-	}
-	if found {
-		// ignore existing vpa
-		return ctrl.Result{}, nil
-	}
-	vpa := common.BuildVPA(deploy.Name, deploy.Namespace, deploy.Kind, deploy.APIVersion, "VPADeploymentController")
-	v.Log.Info("create vpa", "namespace", req.Namespace, "deployment", deploy.Name)
-	err = v.Create(ctx, vpa)
-	if err != nil {
-		v.Log.Error(err, "error creating vpa")
-		return ctrl.Result{}, err
-	}
+
 	return ctrl.Result{}, nil
-}
-
-func (v *VPADeploymentController) getDeployment(ctx context.Context, req ctrl.Request) (bool, *appsv1.Deployment, error) {
-	deploy := new(appsv1.Deployment)
-	err := v.Get(ctx, req.NamespacedName, deploy)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return false, nil, nil
-		} else {
-			return false, nil, err
-		}
-	}
-	return true, deploy, nil
-}
-
-func (v *VPADeploymentController) getVPA(ctx context.Context, req ctrl.Request) (bool, *vpav1.VerticalPodAutoscaler, error) {
-	vpa := new(vpav1.VerticalPodAutoscaler)
-	err := v.Get(ctx, req.NamespacedName, vpa)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return false, nil, nil
-		} else {
-			return false, nil, err
-		}
-	}
-	return true, vpa, nil
 }

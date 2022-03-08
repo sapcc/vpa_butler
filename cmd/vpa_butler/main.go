@@ -1,15 +1,21 @@
 package main
 
 import (
+	"flag"
+	"fmt"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/sapcc/vpa_butler/internal/controllers"
 	"k8s.io/apimachinery/pkg/runtime"
 	autoscaling "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
-	"os"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	"time"
+
+	"github.com/sapcc/vpa_butler/internal/common"
 )
 
 var (
@@ -17,13 +23,34 @@ var (
 	setupLog = ctrl.Log.WithName("setup")
 )
 
-
-func main() {
+func init() {
 	_ = autoscaling.AddToScheme(scheme)
 	_ = clientgoscheme.AddToScheme(scheme)
+}
+
+func main() {
+	supportedUpdatedModes := []string{"Off", "Initial", "Recreate"}
+	var defaultVPAUpdateMode string
+	flag.StringVar(&defaultVPAUpdateMode, "default-vpa-update-mode", "Off",
+		fmt.Sprintf("The default update mode for the VPA instances. Must be one of: %s", strings.Join(supportedUpdatedModes, ",")))
+	flag.Parse()
+
+	if !isStringSliceContains(defaultVPAUpdateMode, supportedUpdatedModes) {
+		fmt.Printf("unsupported update mode %s. Must be one of: %s", defaultVPAUpdateMode, strings.Join(supportedUpdatedModes, ","))
+		os.Exit(1)
+	}
+	switch defaultVPAUpdateMode {
+	case "Initial":
+		common.VPAUpdateMode = autoscaling.UpdateModeInitial
+	case "Recreate":
+		common.VPAUpdateMode = autoscaling.UpdateModeRecreate
+	default:
+		common.VPAUpdateMode = autoscaling.UpdateModeOff
+	}
+
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 	setupLog.Info("starting")
-	syncPeriod := 5*time.Minute
+	syncPeriod := 5 * time.Minute
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,
 		MetricsBindAddress: ":8080",
@@ -35,25 +62,16 @@ func main() {
 	handleError(err, "unable to start manager")
 	deploymentController := controllers.VPADeploymentController{
 		Client: mgr.GetClient(),
-		Log: mgr.GetLogger().WithName("deployment-controller"),
-		Scheme: mgr.GetScheme(),
-		ReSyncPeriod: syncPeriod,
 	}
 	err = deploymentController.SetupWithManager(mgr)
 	handleError(err, "unable to setup deployment controller")
 	daemonsetController := controllers.VPADaemonsetController{
-		Client:       mgr.GetClient(),
-		Log:          mgr.GetLogger().WithName("daemonset-controller"),
-		Scheme:       mgr.GetScheme(),
-		ReSyncPeriod: syncPeriod,
+		Client: mgr.GetClient(),
 	}
 	err = daemonsetController.SetupWithManager(mgr)
 	handleError(err, "unable to setup daemonset controller")
 	statefulSetController := controllers.VPAStatefulSetController{
 		Client: mgr.GetClient(),
-		Log: mgr.GetLogger().WithName("statefulset-controller"),
-		Scheme: mgr.GetScheme(),
-		ReSyncPeriod: syncPeriod,
 	}
 	err = statefulSetController.SetupWithManager(mgr)
 	handleError(err, "unable to setup statefulset controller")
@@ -67,4 +85,13 @@ func handleError(err error, message string, keysAndVals ...interface{}) {
 		setupLog.Error(err, message, keysAndVals...)
 		os.Exit(1)
 	}
+}
+
+func isStringSliceContains(theString string, theStringSlice []string) bool {
+	for _, s := range theStringSlice {
+		if s == theString {
+			return true
+		}
+	}
+	return false
 }
