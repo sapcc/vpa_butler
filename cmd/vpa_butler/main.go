@@ -33,19 +33,34 @@ func main() {
 	var defaultVPAUpdateMode string
 	flag.StringVar(&defaultVPAUpdateMode, "default-vpa-update-mode", "Off",
 		fmt.Sprintf("The default update mode for the VPA instances. Must be one of: %s", strings.Join(supportedUpdatedModes, ",")))
+
+	supportedValues := []string{"RequestsOnly", "RequestsAndLimits"}
+	var defaultVPASupportedValues string
+	flag.StringVar(&defaultVPASupportedValues, "default-vpa-supported-values", "RequestsOnly",
+		fmt.Sprintf("Controls which resource value should be autoscaled. Must be one of: %s", strings.Join(supportedValues, ",")))
+
 	flag.Parse()
 
-	if !isStringSliceContains(defaultVPAUpdateMode, supportedUpdatedModes) {
-		fmt.Printf("unsupported update mode %s. Must be one of: %s", defaultVPAUpdateMode, strings.Join(supportedUpdatedModes, ","))
-		os.Exit(1)
-	}
 	switch defaultVPAUpdateMode {
 	case "Initial":
 		common.VPAUpdateMode = autoscaling.UpdateModeInitial
 	case "Recreate":
 		common.VPAUpdateMode = autoscaling.UpdateModeRecreate
-	default:
+	case "Off":
 		common.VPAUpdateMode = autoscaling.UpdateModeOff
+	default:
+		fmt.Printf("unsupported update mode %s. Must be one of: %s", defaultVPAUpdateMode, strings.Join(supportedUpdatedModes, ","))
+		os.Exit(1)
+	}
+
+	switch defaultVPASupportedValues {
+	case "RequestsAndLimits":
+		common.VPAControlledValues = autoscaling.ContainerControlledValuesRequestsAndLimits
+	case "Requests":
+		common.VPAControlledValues = autoscaling.ContainerControlledValuesRequestsOnly
+	default:
+		fmt.Printf("supported values must be one of: %s", strings.Join(supportedUpdatedModes, ","))
+		os.Exit(1)
 	}
 
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
@@ -85,13 +100,4 @@ func handleError(err error, message string, keysAndVals ...interface{}) {
 		setupLog.Error(err, message, keysAndVals...)
 		os.Exit(1)
 	}
-}
-
-func isStringSliceContains(theString string, theStringSlice []string) bool {
-	for _, s := range theStringSlice {
-		if s == theString {
-			return true
-		}
-	}
-	return false
 }

@@ -14,7 +14,10 @@ const (
 	annotationVPAButler = "vpa_butler"
 )
 
-var VPAUpdateMode = vpav1.UpdateModeOff
+var (
+	VPAUpdateMode       = vpav1.UpdateModeOff
+	VPAControlledValues = vpav1.ContainerControlledValuesRequestsOnly
+)
 
 func isHandleVPA(vpa *vpav1.VerticalPodAutoscaler) bool {
 	if vpa.Annotations == nil {
@@ -35,12 +38,13 @@ func mutateVPA(scheme *runtime.Scheme, vpaOwner client.Object, vpa *vpav1.Vertic
 		UpdateMode: &VPAUpdateMode,
 	}
 
-	resourceList := []v1.ResourceName{"cpu", "memory"}
+	resourceList := []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory}
 	vpaSpec.ResourcePolicy = &vpav1.PodResourcePolicy{
 		ContainerPolicies: []vpav1.ContainerResourcePolicy{
 			{
 				ContainerName:       "*",
 				ControlledResources: &resourceList,
+				ControlledValues:    &VPAControlledValues,
 			},
 		},
 	}
