@@ -56,10 +56,10 @@ func main() {
 	switch defaultVPASupportedValues {
 	case "RequestsAndLimits":
 		common.VPAControlledValues = autoscaling.ContainerControlledValuesRequestsAndLimits
-	case "Requests":
+	case "RequestsOnly":
 		common.VPAControlledValues = autoscaling.ContainerControlledValuesRequestsOnly
 	default:
-		fmt.Printf("supported values must be one of: %s", strings.Join(supportedUpdatedModes, ","))
+		fmt.Printf("supported values must be one of: %s", strings.Join(supportedValues, ","))
 		os.Exit(1)
 	}
 
