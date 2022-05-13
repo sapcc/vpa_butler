@@ -41,6 +41,9 @@ func main() {
 
 	flag.Parse()
 
+	// Helm requires the 'Off' value to be quoted to avoid it being interpreted as a boolean.
+	defaultVPAUpdateMode = strings.TrimPrefix(defaultVPAUpdateMode, "\"")
+	defaultVPAUpdateMode = strings.TrimSuffix(defaultVPAUpdateMode, "\"")
 	switch defaultVPAUpdateMode {
 	case "Initial":
 		common.VPAUpdateMode = autoscaling.UpdateModeInitial
