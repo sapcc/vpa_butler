@@ -27,7 +27,7 @@ func isHandleVPA(vpa *vpav1.VerticalPodAutoscaler) bool {
 	return ok && v == annotationVPAButler
 }
 
-func mutateVPA(scheme *runtime.Scheme, vpaOwner client.Object, vpa *vpav1.VerticalPodAutoscaler) error {
+func mutateVPA(scheme *runtime.Scheme, vpaOwner client.Object, vpa *vpav1.VerticalPodAutoscaler, containers []v1.Container) error {
 	vpaSpec := &vpa.Spec
 	vpaSpec.TargetRef = &autoscaling.CrossVersionObjectReference{
 		Kind:       vpaOwner.GetObjectKind().GroupVersionKind().Kind,
@@ -39,14 +39,27 @@ func mutateVPA(scheme *runtime.Scheme, vpaOwner client.Object, vpa *vpav1.Vertic
 	}
 
 	resourceList := []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory}
-	vpaSpec.ResourcePolicy = &vpav1.PodResourcePolicy{
-		ContainerPolicies: []vpav1.ContainerResourcePolicy{
-			{
-				ContainerName:       "*",
+	var cp []vpav1.ContainerResourcePolicy
+	for _, container := range containers {
+		if len(container.Resources.Requests) != 0 {
+			crp := vpav1.ContainerResourcePolicy{
+				ContainerName: container.Name,
 				ControlledResources: &resourceList,
-				ControlledValues:    &VPAControlledValues,
-			},
-		},
+				ControlledValues: &VPAControlledValues,
+				MinAllowed: container.Resources.Requests,
+			}
+			cp = append(cp, crp)
+		} else {
+			crp := vpav1.ContainerResourcePolicy{
+				ContainerName: container.Name,
+				ControlledResources: &resourceList,
+				ControlledValues: &VPAControlledValues,
+			}
+			cp = append(cp, crp)
+		}
+	}
+	vpaSpec.ResourcePolicy = &vpav1.PodResourcePolicy{
+		ContainerPolicies: cp,
 	}
 	if vpa.Annotations == nil {
 		vpa.Annotations = make(map[string]string, 0)
