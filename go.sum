@@ -973,6 +973,8 @@ k8s.io/apimachinery v0.23.0/go.mod h1:fFCTTBKvKcwTPFzjlcxp91uPFZr+JA0FubU4fLzzFY
 k8s.io/apiserver v0.23.0/go.mod h1:Cec35u/9zAepDPPFyT+UMrgqOCjgJ5qtfVJDxjZYmt4=
 k8s.io/autoscaler/vertical-pod-autoscaler v0.10.0 h1:mSO9phIinHH3bRuXQkHMIA2uJ4i1WSayDeYr8J3bGjU=
 k8s.io/autoscaler/vertical-pod-autoscaler v0.10.0/go.mod h1:sOm4JDB+0ZrrqFuscsbWL5KoFMMJuOrN1NE/6ulmYNA=
+k8s.io/autoscaler/vertical-pod-autoscaler v0.11.0 h1:vh6cHU/sZBjdfYlKZOhXkMI5CTCgK12TauHGoQOue+4=
+k8s.io/autoscaler/vertical-pod-autoscaler v0.11.0/go.mod h1:CviXA+byKc3EV10oxt8S+YYVipks1+onIqLGNPV52xM=
 k8s.io/client-go v0.18.3/go.mod h1:4a/dpQEvzAhT1BbuWW09qvIaGw6Gbu1gZYiQZIi1DMw=
 k8s.io/client-go v0.23.0 h1:vcsOqyPq7XV3QmQRCBH/t9BICJM9Q1M18qahjv+rebY=
 k8s.io/client-go v0.23.0/go.mod h1:hrDnpnK1mSr65lHHcUuIZIXDgEbzc7/683c6hyG4jTA=
