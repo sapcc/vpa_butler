@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"fmt"
+	v1 "k8s.io/api/core/v1"
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -25,7 +26,7 @@ const ( // They should complete the sentence "Deployment default/foo has been ..
 	OperationResultUpdated OperationResult = "updated"
 )
 
-func ReconcileVPA(ctx context.Context, c client.Client, scheme *runtime.Scheme, vpaOwner client.Object) (OperationResult, error) {
+func ReconcileVPA(ctx context.Context, c client.Client, scheme *runtime.Scheme, vpaOwner client.Object, containers []v1.Container) (OperationResult, error) {
 	var vpa = new(vpav1.VerticalPodAutoscaler)
 	vpa.Namespace = vpaOwner.GetNamespace()
 	vpa.Name = vpaOwner.GetName()
@@ -36,7 +37,7 @@ func ReconcileVPA(ctx context.Context, c client.Client, scheme *runtime.Scheme, 
 			return OperationResultNone, err
 		}
 		// Mutate and create the VPA.
-		if err := mutateVPA(scheme, vpaOwner, vpa); err != nil {
+		if err := mutateVPA(scheme, vpaOwner, vpa, containers); err != nil {
 			return OperationResultNone, errors.Wrap(err, "mutating object failed")
 		}
 		if err := c.Create(ctx, vpa); err != nil {
@@ -55,12 +56,12 @@ func ReconcileVPA(ctx context.Context, c client.Client, scheme *runtime.Scheme, 
 			return OperationResultNone, fmt.Errorf("the resource %s/%s already exists but is marked for deletion", o.GetNamespace(), o.GetName())
 		}
 	}
-	return patch(ctx, c, scheme, vpa, vpaOwner)
+	return patch(ctx, c, scheme, vpa, vpaOwner, containers)
 }
 
-func patch(ctx context.Context, c client.Client, scheme *runtime.Scheme, vpa *vpav1.VerticalPodAutoscaler, vpaOwner client.Object) (OperationResult, error) {
+func patch(ctx context.Context, c client.Client, scheme *runtime.Scheme, vpa *vpav1.VerticalPodAutoscaler, vpaOwner client.Object, containers []v1.Container) (OperationResult, error) {
 	before := vpa.DeepCopyObject().(client.Object)
-	if err := mutateVPA(scheme, vpaOwner, vpa); err != nil {
+	if err := mutateVPA(scheme, vpaOwner, vpa, containers); err != nil {
 		return OperationResultNone, errors.Wrap(err, "mutating object failed")
 	}
 	if equality.Semantic.DeepEqual(before, vpa) {
