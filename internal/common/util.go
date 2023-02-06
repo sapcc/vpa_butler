@@ -85,7 +85,7 @@ func GetVPAName(vpaOwner client.Object) string {
 	name := vpaOwner.GetName()
 	kind := strings.ToLower(vpaOwner.GetObjectKind().GroupVersionKind().Kind)
 	if len(name)+len(kind) > 63 {
-		name = name[0 : len(name)-len(kind)]
+		name = name[0 : len(name)-len(kind)-1]
 	}
 	return fmt.Sprintf("%s-%s", name, kind)
 }
