@@ -77,6 +77,7 @@ func main() {
 		Namespace:          "",
 		SyncPeriod:         &syncPeriod,
 	})
+
 	handleError(err, "unable to start manager")
 	deploymentController := controllers.VPADeploymentController{
 		Client: mgr.GetClient(),
@@ -93,6 +94,11 @@ func main() {
 	}
 	err = statefulSetController.SetupWithManager(mgr)
 	handleError(err, "unable to setup statefulset controller")
+	cleanupController := controllers.VPACleanupController{
+		Client: mgr.GetClient(),
+	}
+	err = cleanupController.SetupWithManager(mgr)
+	handleError(err, "unable to setup cleanup controller")
 	setupLog.Info("starting manager")
 	err = mgr.Start(ctrl.SetupSignalHandler())
 	handleError(err, "problem running manager")

@@ -42,7 +42,7 @@ func (v *VPAStatefulSetController) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	result, err := common.ReconcileVPA(ctx, v.Client, v.scheme, statefulset)
+	result, err := common.ReconcileVPA(ctx, v.Client, v.scheme, statefulset, v.log)
 	if err != nil {
 		return ctrl.Result{}, err
 	}

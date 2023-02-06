@@ -19,7 +19,7 @@ var (
 	VPAControlledValues = vpav1.ContainerControlledValuesRequestsOnly
 )
 
-func isHandleVPA(vpa *vpav1.VerticalPodAutoscaler) bool {
+func IsHandleVPA(vpa *vpav1.VerticalPodAutoscaler) bool {
 	if vpa.Annotations == nil {
 		return false
 	}
