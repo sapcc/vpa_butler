@@ -21,6 +21,7 @@ import (
 var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
+	Version  string
 )
 
 func init() {
@@ -77,6 +78,7 @@ func main() {
 		Namespace:          "",
 		SyncPeriod:         &syncPeriod,
 	})
+
 	handleError(err, "unable to start manager")
 	deploymentController := controllers.VPADeploymentController{
 		Client: mgr.GetClient(),
@@ -93,6 +95,12 @@ func main() {
 	}
 	err = statefulSetController.SetupWithManager(mgr)
 	handleError(err, "unable to setup statefulset controller")
+	vpaController := controllers.VPAController{
+		Client:  mgr.GetClient(),
+		Version: Version,
+	}
+	err = vpaController.SetupWithManager(mgr)
+	handleError(err, "unable to setup vpa controller")
 	setupLog.Info("starting manager")
 	err = mgr.Start(ctrl.SetupSignalHandler())
 	handleError(err, "problem running manager")

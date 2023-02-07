@@ -10,8 +10,9 @@ import (
 )
 
 const (
-	annotationManagedBy = "managedBy"
-	annotationVPAButler = "vpa_butler"
+	AnnotationManagedBy        = "managedBy"
+	AnnotationVPAButler        = "vpa_butler"
+	AnnotationVPAButlerVersion = "cloud.sap/vpa-butler-version"
 )
 
 var (
@@ -19,12 +20,12 @@ var (
 	VPAControlledValues = vpav1.ContainerControlledValuesRequestsOnly
 )
 
-func isHandleVPA(vpa *vpav1.VerticalPodAutoscaler) bool {
+func IsHandleVPA(vpa *vpav1.VerticalPodAutoscaler) bool {
 	if vpa.Annotations == nil {
 		return false
 	}
-	v, ok := vpa.Annotations[annotationManagedBy]
-	return ok && v == annotationVPAButler
+	v, ok := vpa.Annotations[AnnotationManagedBy]
+	return ok && v == AnnotationVPAButler
 }
 
 func mutateVPA(scheme *runtime.Scheme, vpaOwner client.Object, vpa *vpav1.VerticalPodAutoscaler) error {
@@ -51,7 +52,7 @@ func mutateVPA(scheme *runtime.Scheme, vpaOwner client.Object, vpa *vpav1.Vertic
 	if vpa.Annotations == nil {
 		vpa.Annotations = make(map[string]string, 0)
 	}
-	vpa.Annotations[annotationManagedBy] = annotationVPAButler
+	vpa.Annotations[AnnotationManagedBy] = AnnotationVPAButler
 
 	return controllerutil.SetOwnerReference(vpaOwner, vpa, scheme)
 }

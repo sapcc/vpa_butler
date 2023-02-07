@@ -42,7 +42,7 @@ func (v *VPADeploymentController) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	result, err := common.ReconcileVPA(ctx, v.Client, v.scheme, deploy)
+	result, err := common.ReconcileVPA(ctx, v.Client, v.scheme, deploy, v.log)
 	if err != nil {
 		return ctrl.Result{}, err
 	}

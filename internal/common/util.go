@@ -3,7 +3,9 @@ package common
 import (
 	"context"
 	"fmt"
+	"strings"
 
+	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -25,11 +27,10 @@ const ( // They should complete the sentence "Deployment default/foo has been ..
 	OperationResultUpdated OperationResult = "updated"
 )
 
-func ReconcileVPA(ctx context.Context, c client.Client, scheme *runtime.Scheme, vpaOwner client.Object) (OperationResult, error) {
+func ReconcileVPA(ctx context.Context, c client.Client, scheme *runtime.Scheme, vpaOwner client.Object, log logr.Logger) (OperationResult, error) {
 	var vpa = new(vpav1.VerticalPodAutoscaler)
 	vpa.Namespace = vpaOwner.GetNamespace()
-	vpa.Name = vpaOwner.GetName()
-
+	vpa.Name = GetVPAName(vpaOwner)
 	if err := c.Get(ctx, client.ObjectKeyFromObject(vpa), vpa); err != nil {
 		// Return any other error.
 		if !apierrors.IsNotFound(err) {
@@ -46,7 +47,7 @@ func ReconcileVPA(ctx context.Context, c client.Client, scheme *runtime.Scheme, 
 	}
 
 	// Return here if the butler does not manage this VPA.
-	if !isHandleVPA(vpa) {
+	if !IsHandleVPA(vpa) {
 		return OperationResultNone, nil
 	}
 
@@ -78,4 +79,24 @@ func ignoreAlreadyExists(err error) error {
 		return nil
 	}
 	return err
+}
+
+func GetVPAName(vpaOwner client.Object) string {
+	name := vpaOwner.GetName()
+	kind := strings.ToLower(vpaOwner.GetObjectKind().GroupVersionKind().Kind)
+	if len(name)+len(kind) > 63 {
+		name = name[0 : len(name)-len(kind)-1]
+	}
+	return fmt.Sprintf("%s-%s", name, kind)
+}
+
+func IsNewNamingSchema(name string) bool {
+	suffixes := []string{"-daemonset", "-statefulset", "-deployment"}
+	for _, prefix := range suffixes {
+		if strings.HasSuffix(name, prefix) {
+			return true
+		}
+	}
+
+	return false
 }

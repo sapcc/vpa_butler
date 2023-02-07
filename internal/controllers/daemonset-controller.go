@@ -41,7 +41,7 @@ func (v *VPADaemonsetController) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	result, err := common.ReconcileVPA(ctx, v.Client, v.scheme, daemon)
+	result, err := common.ReconcileVPA(ctx, v.Client, v.scheme, daemon, v.log)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
