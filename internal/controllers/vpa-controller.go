@@ -12,14 +12,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 )
 
-type VPACleanupController struct {
+type VPAController struct {
 	client.Client
-	log    logr.Logger
-	scheme *runtime.Scheme
+	log     logr.Logger
+	scheme  *runtime.Scheme
+	Version string
 }
 
-func (v *VPACleanupController) SetupWithManager(mgr ctrl.Manager) error {
-	name := "cleanup-controller"
+func (v *VPAController) SetupWithManager(mgr ctrl.Manager) error {
+	name := "vpa-controller"
 	v.Client = mgr.GetClient()
 	v.log = mgr.GetLogger().WithName(name)
 	v.scheme = mgr.GetScheme()
@@ -30,18 +31,33 @@ func (v *VPACleanupController) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(v)
 }
 
-func (v *VPACleanupController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (v *VPAController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var vpa = new(vpav1.VerticalPodAutoscaler)
 	if err := v.Get(ctx, req.NamespacedName, vpa); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	// clean-up vpa resources with old naming schema
 	if !common.IsNewNamingSchema(vpa.GetName()) && common.IsHandleVPA(vpa) {
 		err := v.Delete(ctx, vpa)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 		v.log.Info("Cleanup old VPA successful", "namespace", vpa.GetNamespace(), "name", vpa.GetName())
+		return ctrl.Result{}, nil
+	}
+
+	// update version annotation
+	if common.IsHandleVPA(vpa) && v.Version != "" {
+		version, ok := vpa.Annotations[common.AnnotationVPAButlerVersion]
+		if !ok || version != v.Version {
+			vpa.Annotations[common.AnnotationVPAButlerVersion] = v.Version
+			err := v.Client.Update(ctx, vpa)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			v.log.Info("Updated version annotation", "namespace", vpa.GetNamespace(), "name", vpa.GetName())
+		}
 	}
 
 	return ctrl.Result{}, nil
