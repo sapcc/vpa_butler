@@ -3,7 +3,7 @@ module github.com/sapcc/vpa_butler
 go 1.17
 
 require (
-	github.com/go-logr/logr v1.2.0
+	github.com/go-logr/logr v1.2.4
 	github.com/pkg/errors v0.9.1
 	k8s.io/api v0.23.0
 	k8s.io/apimachinery v0.23.0
