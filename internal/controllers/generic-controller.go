@@ -13,6 +13,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 )
 
+const (
+	controllerConcurrency = 10
+)
+
 type GenericController[T client.Object] struct {
 	client.Client
 	typeName string
@@ -30,7 +34,7 @@ func (v *GenericController[T]) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(name).
 		For(instance).
-		WithOptions(controller.Options{MaxConcurrentReconciles: 10, Log: v.log}).
+		WithOptions(controller.Options{MaxConcurrentReconciles: controllerConcurrency, Log: v.log}).
 		Complete(v)
 }
 
@@ -40,13 +44,19 @@ func (v *GenericController[T]) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	result, err := common.ReconcileVPA(ctx, v.Client, v.scheme, instance, v.log)
+	result, err := common.ReconcileVPA(ctx, common.VPAReconcileParams{
+		Client:   v.Client,
+		Scheme:   v.scheme,
+		VpaOwner: instance,
+		Log:      v.log,
+	})
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 	switch result {
 	case common.OperationResultCreated, common.OperationResultUpdated:
 		v.log.Info(fmt.Sprintf("VPA for %s was %s", v.typeName, result), "namespace", req.Namespace, "name", req.Name)
+	case common.OperationResultNone:
 	}
 
 	return ctrl.Result{}, nil

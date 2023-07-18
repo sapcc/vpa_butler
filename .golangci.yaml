@@ -1,0 +1,76 @@
+linters:
+  enable:
+  - gosec
+  - unconvert
+  - goconst
+  - gocyclo
+  - asciicheck
+  - misspell
+  - lll
+  - unparam
+  - dogsled
+  - nakedret
+  - prealloc
+  - gocritic
+  - godox
+  - funlen
+  - whitespace
+  - gomnd
+  - godot
+  - nestif
+  - nolintlint
+  - bodyclose
+  - cyclop
+  - durationcheck
+  - errorlint
+  - exhaustive
+  - exportloopref
+  - forcetypeassert
+  - importas
+  - makezero
+  - nilerr
+  - noctx
+  - predeclared
+  - tagliatelle
+  - revive
+  - ifshort
+  - asasalint
+  - decorder
+  - errchkjson
+  - errname
+  - execinquery
+  - grouper
+  - maintidx
+  - nilnil
+  - nonamedreturns
+  - nosprintfhostport
+  - tenv
+  - usestdlibvars
+
+  - asasalint
+  - bidichk
+  - bodyclose
+  - containedctx
+  - unused
+  - dupl
+  - dupword
+  - interfacebloat
+  - loggercheck
+  - reassign
+  disable-all: false
+  fast: false
+linters-settings:
+  revive:
+    rules:
+    - name: unused-parameter
+      disabled: true
+issues:
+  exclude-rules:
+    # Exclude some linters from running on tests files.
+    - path: _test\.go
+      linters:
+        - forcetypeassert
+        - dupl
+    - linters:
+        - lll
+      source: "^//.*https://.*" # Exclude links from line length check

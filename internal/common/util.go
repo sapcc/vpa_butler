@@ -15,32 +15,41 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// OperationResult is the action result of a CreateOrUpdate call
+// OperationResult is the action result of a CreateOrUpdate call.
 type OperationResult string
 
 const ( // They should complete the sentence "Deployment default/foo has been ..."
-	// OperationResultNone means that the resource has not been changed
+	// OperationResultNone means that the resource has not been changed.
 	OperationResultNone OperationResult = "unchanged"
-	// OperationResultCreated means that a new resource is created
+	// OperationResultCreated means that a new resource is created.
 	OperationResultCreated OperationResult = "created"
-	// OperationResultUpdated means that an existing resource is updated
+	// OperationResultUpdated means that an existing resource is updated.
 	OperationResultUpdated OperationResult = "updated"
+	// maxNameLength is the maximum length of a VPA name.
+	maxNameLength = 63
 )
 
-func ReconcileVPA(ctx context.Context, c client.Client, scheme *runtime.Scheme, vpaOwner client.Object, log logr.Logger) (OperationResult, error) {
+type VPAReconcileParams struct {
+	Client   client.Client
+	Scheme   *runtime.Scheme
+	VpaOwner client.Object
+	Log      logr.Logger
+}
+
+func ReconcileVPA(ctx context.Context, params VPAReconcileParams) (OperationResult, error) {
 	var vpa = new(vpav1.VerticalPodAutoscaler)
-	vpa.Namespace = vpaOwner.GetNamespace()
-	vpa.Name = GetVPAName(vpaOwner)
-	if err := c.Get(ctx, client.ObjectKeyFromObject(vpa), vpa); err != nil {
+	vpa.Namespace = params.VpaOwner.GetNamespace()
+	vpa.Name = GetVPAName(params.VpaOwner)
+	if err := params.Client.Get(ctx, client.ObjectKeyFromObject(vpa), vpa); err != nil {
 		// Return any other error.
 		if !apierrors.IsNotFound(err) {
 			return OperationResultNone, err
 		}
 		// Mutate and create the VPA.
-		if err := mutateVPA(scheme, vpaOwner, vpa); err != nil {
+		if err := mutateVPA(params.Scheme, params.VpaOwner, vpa); err != nil {
 			return OperationResultNone, errors.Wrap(err, "mutating object failed")
 		}
-		if err := c.Create(ctx, vpa); err != nil {
+		if err := params.Client.Create(ctx, vpa); err != nil {
 			return OperationResultNone, ignoreAlreadyExists(err)
 		}
 		return OperationResultCreated, nil
@@ -53,22 +62,26 @@ func ReconcileVPA(ctx context.Context, c client.Client, scheme *runtime.Scheme, 
 
 	if o, err := meta.Accessor(vpa); err == nil {
 		if o.GetDeletionTimestamp() != nil {
-			return OperationResultNone, fmt.Errorf("the resource %s/%s already exists but is marked for deletion", o.GetNamespace(), o.GetName())
+			return OperationResultNone, fmt.Errorf("the resource %s/%s already exists but is marked for deletion",
+				o.GetNamespace(), o.GetName())
 		}
 	}
-	return patch(ctx, c, scheme, vpa, vpaOwner)
+	return patch(ctx, vpa, params)
 }
 
-func patch(ctx context.Context, c client.Client, scheme *runtime.Scheme, vpa *vpav1.VerticalPodAutoscaler, vpaOwner client.Object) (OperationResult, error) {
-	before := vpa.DeepCopyObject().(client.Object)
-	if err := mutateVPA(scheme, vpaOwner, vpa); err != nil {
+func patch(ctx context.Context, vpa *vpav1.VerticalPodAutoscaler, params VPAReconcileParams) (OperationResult, error) {
+	before, ok := vpa.DeepCopyObject().(client.Object)
+	if !ok {
+		return OperationResultNone, fmt.Errorf("failed to cast object to client.Object")
+	}
+	if err := mutateVPA(params.Scheme, params.VpaOwner, vpa); err != nil {
 		return OperationResultNone, errors.Wrap(err, "mutating object failed")
 	}
 	if equality.Semantic.DeepEqual(before, vpa) {
 		return OperationResultNone, nil
 	}
 	patch := client.MergeFrom(before)
-	if err := c.Patch(ctx, vpa, patch); err != nil {
+	if err := params.Client.Patch(ctx, vpa, patch); err != nil {
 		return OperationResultNone, err
 	}
 	return OperationResultUpdated, nil
@@ -84,7 +97,7 @@ func ignoreAlreadyExists(err error) error {
 func GetVPAName(vpaOwner client.Object) string {
 	name := vpaOwner.GetName()
 	kind := strings.ToLower(vpaOwner.GetObjectKind().GroupVersionKind().Kind)
-	if len(name)+len(kind) > 63 {
+	if len(name)+len(kind) > maxNameLength {
 		name = name[0 : len(name)-len(kind)-1]
 	}
 	return fmt.Sprintf("%s-%s", name, kind)

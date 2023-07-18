@@ -19,10 +19,15 @@ import (
 	"github.com/sapcc/vpa_butler/internal/common"
 )
 
+const (
+	webhookPort = 9443
+)
+
 var (
-	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
-	Version  string
+	scheme     = runtime.NewScheme()
+	setupLog   = ctrl.Log.WithName("setup")
+	syncPeriod = 5 * time.Minute
+	Version    string
 )
 
 func init() {
@@ -34,12 +39,14 @@ func main() {
 	supportedUpdatedModes := []string{"Off", "Initial", "Recreate"}
 	var defaultVPAUpdateMode string
 	flag.StringVar(&defaultVPAUpdateMode, "default-vpa-update-mode", "Off",
-		fmt.Sprintf("The default update mode for the VPA instances. Must be one of: %s", strings.Join(supportedUpdatedModes, ",")))
+		fmt.Sprintf("The default update mode for the VPA instances. Must be one of: %s",
+			strings.Join(supportedUpdatedModes, ",")))
 
 	supportedValues := []string{"RequestsOnly", "RequestsAndLimits"}
 	var defaultVPASupportedValues string
 	flag.StringVar(&defaultVPASupportedValues, "default-vpa-supported-values", "RequestsOnly",
-		fmt.Sprintf("Controls which resource value should be autoscaled. Must be one of: %s", strings.Join(supportedValues, ",")))
+		fmt.Sprintf("Controls which resource value should be autoscaled. Must be one of: %s",
+			strings.Join(supportedValues, ",")))
 
 	flag.Parse()
 
@@ -54,7 +61,9 @@ func main() {
 	case "Off":
 		common.VPAUpdateMode = autoscaling.UpdateModeOff
 	default:
-		fmt.Printf("unsupported update mode %s. Must be one of: %s", defaultVPAUpdateMode, strings.Join(supportedUpdatedModes, ","))
+		fmt.Printf("unsupported update mode %s. Must be one of: %s",
+			defaultVPAUpdateMode,
+			strings.Join(supportedUpdatedModes, ","))
 		os.Exit(1)
 	}
 
@@ -70,21 +79,27 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 	setupLog.Info("starting")
-	syncPeriod := 5 * time.Minute
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,
 		MetricsBindAddress: ":8080",
-		Port:               9443,
+		Port:               webhookPort,
 		LeaderElection:     false,
 		Namespace:          "",
 		SyncPeriod:         &syncPeriod,
 	})
 
 	handleError(err, "unable to start manager")
+	setupControllers(mgr)
+	setupLog.Info("starting manager")
+	err = mgr.Start(ctrl.SetupSignalHandler())
+	handleError(err, "problem running manager")
+}
+
+func setupControllers(mgr ctrl.Manager) {
 	deploymentController := controllers.GenericController[*appsv1.Deployment]{
 		Client: mgr.GetClient(),
 	}
-	err = deploymentController.SetupWithManager(mgr)
+	err := deploymentController.SetupWithManager(mgr)
 	handleError(err, "unable to setup deployment controller")
 	daemonsetController := controllers.GenericController[*appsv1.DaemonSet]{
 		Client: mgr.GetClient(),
@@ -102,14 +117,11 @@ func main() {
 	}
 	err = vpaController.SetupWithManager(mgr)
 	handleError(err, "unable to setup vpa controller")
-	setupLog.Info("starting manager")
-	err = mgr.Start(ctrl.SetupSignalHandler())
-	handleError(err, "problem running manager")
 }
 
-func handleError(err error, message string, keysAndVals ...interface{}) {
+func handleError(err error, message string) {
 	if err != nil {
-		setupLog.Error(err, message, keysAndVals...)
+		setupLog.Error(err, message)
 		os.Exit(1)
 	}
 }
