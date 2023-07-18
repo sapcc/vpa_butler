@@ -27,7 +27,7 @@ func (v *VPAController) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(name).
 		For(&vpav1.VerticalPodAutoscaler{}).
-		WithOptions(controller.Options{MaxConcurrentReconciles: 1, Log: v.log}).
+		WithOptions(controller.Options{MaxConcurrentReconciles: 1}).
 		Complete(v)
 }
 

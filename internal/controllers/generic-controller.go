@@ -34,7 +34,7 @@ func (v *GenericController[T]) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(name).
 		For(instance).
-		WithOptions(controller.Options{MaxConcurrentReconciles: controllerConcurrency, Log: v.log}).
+		WithOptions(controller.Options{MaxConcurrentReconciles: controllerConcurrency}).
 		Complete(v)
 }
 
