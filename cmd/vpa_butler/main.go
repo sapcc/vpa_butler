@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/sapcc/vpa_butler/internal/controllers"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	autoscaling "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -80,17 +81,17 @@ func main() {
 	})
 
 	handleError(err, "unable to start manager")
-	deploymentController := controllers.VPADeploymentController{
+	deploymentController := controllers.GenericController[*appsv1.Deployment]{
 		Client: mgr.GetClient(),
 	}
 	err = deploymentController.SetupWithManager(mgr)
 	handleError(err, "unable to setup deployment controller")
-	daemonsetController := controllers.VPADaemonsetController{
+	daemonsetController := controllers.GenericController[*appsv1.DaemonSet]{
 		Client: mgr.GetClient(),
 	}
 	err = daemonsetController.SetupWithManager(mgr)
 	handleError(err, "unable to setup daemonset controller")
-	statefulSetController := controllers.VPAStatefulSetController{
+	statefulSetController := controllers.GenericController[*appsv1.StatefulSet]{
 		Client: mgr.GetClient(),
 	}
 	err = statefulSetController.SetupWithManager(mgr)
