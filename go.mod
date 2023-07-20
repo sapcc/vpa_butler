@@ -9,7 +9,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	k8s.io/api v0.27.3
 	k8s.io/apimachinery v0.27.3
-	k8s.io/autoscaler/vertical-pod-autoscaler v0.10.0
+	k8s.io/autoscaler/vertical-pod-autoscaler v0.14.0
 	k8s.io/client-go v0.27.3
 	k8s.io/utils v0.0.0-20230209194617-a36077c30491
 	sigs.k8s.io/controller-runtime v0.15.0
@@ -19,7 +19,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/emicklei/go-restful/v3 v3.9.0 // indirect
+	github.com/emicklei/go-restful/v3 v3.10.1 // indirect
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/go-logr/zapr v1.2.4 // indirect
