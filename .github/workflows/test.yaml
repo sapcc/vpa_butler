@@ -1,0 +1,69 @@
+name: Build and run tests
+on: [push, pull_request]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.20'
+          check-latest: true
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          # always uses the latest patch version.
+          version: v1.52
+          args: "--timeout 5m"
+  
+  vulncheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.20'
+          check-latest: true
+
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: Run govulncheck
+        run: govulncheck ./...
+  
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.20'
+          check-latest: true
+
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Install Ginkgo CLI
+        run: |
+          go install github.com/onsi/ginkgo/v2/ginkgo@v2.11.0
+          go install sigs.k8s.io/controller-runtime/tools/setup-envtest@v0.0.0-20230720032208-b1d6919d3e12
+
+      - name: Run tests
+        run: |
+          make test -o lint
