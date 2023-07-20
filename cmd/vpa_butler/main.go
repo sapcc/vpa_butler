@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/sapcc/vpa_butler/internal/controllers"
-	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	autoscaling "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -27,7 +26,8 @@ var (
 	scheme     = runtime.NewScheme()
 	setupLog   = ctrl.Log.WithName("setup")
 	syncPeriod = 5 * time.Minute
-	Version    string
+
+	Version string
 )
 
 func init() {
@@ -47,12 +47,10 @@ func main() {
 	flag.StringVar(&defaultVPASupportedValues, "default-vpa-supported-values", "RequestsOnly",
 		fmt.Sprintf("Controls which resource value should be autoscaled. Must be one of: %s",
 			strings.Join(supportedValues, ",")))
-
 	flag.Parse()
 
 	// Helm requires the 'Off' value to be quoted to avoid it being interpreted as a boolean.
-	defaultVPAUpdateMode = strings.TrimPrefix(defaultVPAUpdateMode, "\"")
-	defaultVPAUpdateMode = strings.TrimSuffix(defaultVPAUpdateMode, "\"")
+	defaultVPAUpdateMode = strings.Trim(defaultVPAUpdateMode, "\"")
 	switch defaultVPAUpdateMode {
 	case "Initial":
 		common.VPAUpdateMode = autoscaling.UpdateModeInitial
@@ -89,34 +87,14 @@ func main() {
 	})
 
 	handleError(err, "unable to start manager")
-	setupControllers(mgr)
-	setupLog.Info("starting manager")
-	err = mgr.Start(ctrl.SetupSignalHandler())
-	handleError(err, "problem running manager")
-}
-
-func setupControllers(mgr ctrl.Manager) {
-	deploymentController := controllers.GenericController[*appsv1.Deployment]{
-		Client: mgr.GetClient(),
-	}
-	err := deploymentController.SetupWithManager(mgr)
-	handleError(err, "unable to setup deployment controller")
-	daemonsetController := controllers.GenericController[*appsv1.DaemonSet]{
-		Client: mgr.GetClient(),
-	}
-	err = daemonsetController.SetupWithManager(mgr)
-	handleError(err, "unable to setup daemonset controller")
-	statefulSetController := controllers.GenericController[*appsv1.StatefulSet]{
-		Client: mgr.GetClient(),
-	}
-	err = statefulSetController.SetupWithManager(mgr)
-	handleError(err, "unable to setup statefulset controller")
+	handleError(controllers.SetupForAppsV1(mgr), "unable to setup apps/v1 controllers")
 	vpaController := controllers.VPAController{
 		Client:  mgr.GetClient(),
 		Version: Version,
 	}
-	err = vpaController.SetupWithManager(mgr)
-	handleError(err, "unable to setup vpa controller")
+	handleError(vpaController.SetupWithManager(mgr), "unable to setup vpa controller")
+	setupLog.Info("starting manager")
+	handleError(mgr.Start(ctrl.SetupSignalHandler()), "problem running manager")
 }
 
 func handleError(err error, message string) {

@@ -10,8 +10,9 @@ PACKAGES := $(shell find $(SRCDIRS) -type d)
 GO_PKG	 := github.com/sapcc/vpa_butler
 GOFILES  := $(addsuffix /*.go,$(PACKAGES))
 GOFILES  := $(wildcard $(GOFILES))
+GOPATH = $(shell go env GOPATH)
 
-.PHONY: all clean vendor tests static-check
+.PHONY: all clean test
 
 all: bin/$(GOOS)/$(BINARY)
 
@@ -19,6 +20,12 @@ bin/%/$(BINARY): GIT_COMMIT  = $(shell git rev-parse --short HEAD)
 bin/%/$(BINARY): BUILD_DATE  = $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 bin/%/$(BINARY): $(GOFILES) Makefile
 	CGO_ENABLED=0 GOOS=$* GOARCH=amd64 go build -ldflags '-X main.Version=$(VERSION)' -mod vendor -v -o bin/$*/$(BINARY) ./cmd/vpa_butler/main.go && chmod +x bin/$*/$(BINARY)
+
+lint: vendor
+	golangci-lint run --timeout=5m
+
+test: lint
+	bash -c "source <($(GOPATH)/bin/setup-envtest use -p env); $(GOPATH)/bin/ginkgo --randomize-all ./..."
 
 build:
 	docker build $(OPTS) -t $(IMAGE):$(VERSION) .

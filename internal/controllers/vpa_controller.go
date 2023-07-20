@@ -14,16 +14,16 @@ import (
 
 type VPAController struct {
 	client.Client
-	log     logr.Logger
-	scheme  *runtime.Scheme
+	Log     logr.Logger
+	Scheme  *runtime.Scheme
 	Version string
 }
 
 func (v *VPAController) SetupWithManager(mgr ctrl.Manager) error {
 	name := "vpa-controller"
 	v.Client = mgr.GetClient()
-	v.log = mgr.GetLogger().WithName(name)
-	v.scheme = mgr.GetScheme()
+	v.Log = mgr.GetLogger().WithName(name)
+	v.Scheme = mgr.GetScheme()
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(name).
 		For(&vpav1.VerticalPodAutoscaler{}).
@@ -43,7 +43,7 @@ func (v *VPAController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		v.log.Info("Cleanup old VPA successful", "namespace", vpa.GetNamespace(), "name", vpa.GetName())
+		v.Log.Info("Cleanup old VPA successful", "namespace", vpa.GetNamespace(), "name", vpa.GetName())
 		return ctrl.Result{}, nil
 	}
 
@@ -56,7 +56,7 @@ func (v *VPAController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 			if err != nil {
 				return ctrl.Result{}, err
 			}
-			v.log.Info("Updated version annotation", "namespace", vpa.GetNamespace(), "name", vpa.GetName())
+			v.Log.Info("Updated version annotation", "namespace", vpa.GetNamespace(), "name", vpa.GetName())
 		}
 	}
 
