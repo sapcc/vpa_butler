@@ -11,7 +11,7 @@ require (
 	k8s.io/apimachinery v0.27.3
 	k8s.io/autoscaler/vertical-pod-autoscaler v0.10.0
 	k8s.io/client-go v0.27.3
-	k8s.io/utils v0.0.0-20230209194617-a36077c30491
+	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 	sigs.k8s.io/controller-runtime v0.15.0
 )
 
