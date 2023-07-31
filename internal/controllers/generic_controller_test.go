@@ -15,7 +15,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	vpav1 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 var _ = Describe("GenericControllers", func() {
@@ -74,7 +74,7 @@ var _ = Describe("GenericControllers", func() {
 			deployment.Namespace = metav1.NamespaceDefault
 			deployment.Spec.Selector = &selector
 			deployment.Spec.Template.ObjectMeta.Labels = labels
-			deployment.Spec.Replicas = pointer.Int32(1)
+			deployment.Spec.Replicas = ptr.To[int32](1)
 			deployment.Spec.Template.Spec.Containers = containers
 			Expect(k8sClient.Create(context.Background(), deployment)).To(Succeed())
 		})
@@ -119,7 +119,7 @@ var _ = Describe("GenericControllers", func() {
 			statefulset.Namespace = metav1.NamespaceDefault
 			statefulset.Spec.Selector = &selector
 			statefulset.Spec.Template.ObjectMeta.Labels = labels
-			statefulset.Spec.Replicas = pointer.Int32(1)
+			statefulset.Spec.Replicas = ptr.To[int32](1)
 			statefulset.Spec.Template.Spec.Containers = containers
 			Expect(k8sClient.Create(context.Background(), &statefulset)).To(Succeed())
 		})
