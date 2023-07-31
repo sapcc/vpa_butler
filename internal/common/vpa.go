@@ -1,6 +1,9 @@
 package common
 
 import (
+	"context"
+	"fmt"
+
 	autoscaling "k8s.io/api/autoscaling/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -20,12 +23,39 @@ var (
 	VPAControlledValues = vpav1.ContainerControlledValuesRequestsOnly
 )
 
-func IsHandleVPA(vpa *vpav1.VerticalPodAutoscaler) bool {
+func ManagedByButler(vpa *vpav1.VerticalPodAutoscaler) bool {
 	if vpa.Annotations == nil {
 		return false
 	}
 	v, ok := vpa.Annotations[AnnotationManagedBy]
 	return ok && v == AnnotationVPAButler
+}
+
+func ShouldHandleVPA(ctx context.Context, params VPAReconcileParams) (bool, error) {
+	var vpas vpav1.VerticalPodAutoscalerList
+	err := params.Client.List(ctx, &vpas, client.InNamespace(params.VpaOwner.GetNamespace()))
+	if err != nil {
+		return false, fmt.Errorf("failed to list vpas: %w", err)
+	}
+	for i := range vpas.Items {
+		vpa := vpas.Items[i]
+		if vpa.Spec.TargetRef == nil {
+			continue
+		}
+		// vpa matches the vpa owner
+		if vpa.Spec.TargetRef.Name == params.VpaOwner.GetName() &&
+			vpa.Spec.TargetRef.Kind == params.VpaOwner.GetObjectKind().GroupVersionKind().Kind &&
+			vpa.Spec.TargetRef.APIVersion == params.VpaOwner.GetObjectKind().GroupVersionKind().Version {
+			managed := ManagedByButler(&vpa)
+			if !managed {
+				// there is a hand-crafted VPA targeting a resource the butler cares about
+				// so the served VPA needs to be deleted
+				return false, nil
+			}
+		}
+	}
+	// no vpa found or vpa managed by butler, so handle it
+	return true, nil
 }
 
 func mutateVPA(scheme *runtime.Scheme, vpaOwner client.Object, vpa *vpav1.VerticalPodAutoscaler) error {

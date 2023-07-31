@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/go-logr/logr"
 	"github.com/sapcc/vpa_butler/internal/common"
@@ -27,7 +28,7 @@ type GenericController struct {
 }
 
 func (v *GenericController) SetupWithManager(mgr ctrl.Manager, instance client.Object) error {
-	v.typeName = reflect.TypeOf(instance).Elem().Name()
+	v.typeName = strings.ToLower(reflect.TypeOf(instance).Elem().Name())
 	name := fmt.Sprintf("%s-controller", v.typeName)
 	v.Client = mgr.GetClient()
 	v.Log = mgr.GetLogger().WithName(name)
@@ -59,7 +60,7 @@ func (v *GenericController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 	switch result {
-	case common.OperationResultCreated, common.OperationResultUpdated:
+	case common.OperationResultCreated, common.OperationResultUpdated, common.OperationResultDeleted:
 		v.Log.Info(fmt.Sprintf("VPA for %s was %s", v.typeName, result), "namespace", req.Namespace, "name", req.Name)
 	case common.OperationResultNone:
 	}
