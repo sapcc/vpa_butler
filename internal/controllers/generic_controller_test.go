@@ -31,7 +31,7 @@ var _ = Describe("GenericControllers", func() {
 		},
 	}
 
-	expectVPA := func(name string) {
+	expectVpa := func(name string) {
 		var vpaRef types.NamespacedName
 		vpaRef.Name = name
 		vpaRef.Namespace = metav1.NamespaceDefault
@@ -43,16 +43,16 @@ var _ = Describe("GenericControllers", func() {
 			}
 			mangedBy, ok := vpa.Annotations[common.AnnotationManagedBy]
 			if !ok {
-				return fmt.Errorf("VPA does not have managed-by annotation")
+				return fmt.Errorf("vpa does not have managed-by annotation")
 			}
-			if mangedBy != common.AnnotationVPAButler {
-				return fmt.Errorf("VPA has wrong managed-by annotation")
+			if mangedBy != common.AnnotationVpaButler {
+				return fmt.Errorf("vpa has wrong managed-by annotation")
 			}
 			return nil
 		}).Should(Succeed())
 	}
 
-	deleteVPA := func(name string) {
+	deleteVpa := func(name string) {
 		var vpaRef types.NamespacedName
 		vpaRef.Name = name
 		vpaRef.Namespace = metav1.NamespaceDefault
@@ -80,15 +80,15 @@ var _ = Describe("GenericControllers", func() {
 		})
 
 		AfterEach(func() {
-			deleteVPA("test-deployment-deployment")
+			deleteVpa("test-deployment-deployment")
 			Expect(k8sClient.Delete(context.Background(), deployment)).To(Succeed())
 		})
 
-		It("should create a VPA", func() {
-			expectVPA("test-deployment-deployment")
+		It("should create a vpa", func() {
+			expectVpa("test-deployment-deployment")
 		})
 
-		It("should delete its VPA if one is hand-crafted", func() {
+		It("should delete its vpa if one is hand-crafted", func() {
 			var vpa vpav1.VerticalPodAutoscaler
 			vpa.Name = "test-deployment-custom-vpa"
 			vpa.Namespace = metav1.NamespaceDefault
@@ -107,7 +107,7 @@ var _ = Describe("GenericControllers", func() {
 				}, &vpa)
 				return err
 			}).ShouldNot(Succeed())
-			deleteVPA("test-deployment-custom-vpa")
+			deleteVpa("test-deployment-custom-vpa")
 		})
 	})
 
@@ -125,12 +125,12 @@ var _ = Describe("GenericControllers", func() {
 		})
 
 		AfterEach(func() {
-			deleteVPA("test-statefulset-statefulset")
+			deleteVpa("test-statefulset-statefulset")
 			Expect(k8sClient.Delete(context.Background(), &statefulset)).To(Succeed())
 		})
 
-		It("should create a VPA", func() {
-			expectVPA("test-statefulset-statefulset")
+		It("should create a vpa", func() {
+			expectVpa("test-statefulset-statefulset")
 		})
 	})
 
@@ -147,12 +147,12 @@ var _ = Describe("GenericControllers", func() {
 		})
 
 		AfterEach(func() {
-			deleteVPA("test-daemonset-daemonset")
+			deleteVpa("test-daemonset-daemonset")
 			Expect(k8sClient.Delete(context.Background(), &daemonset)).To(Succeed())
 		})
 
-		It("should create a VPA", func() {
-			expectVPA("test-daemonset-daemonset")
+		It("should create a vpa", func() {
+			expectVpa("test-daemonset-daemonset")
 		})
 	})
 

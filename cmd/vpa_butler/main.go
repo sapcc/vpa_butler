@@ -37,39 +37,39 @@ func init() {
 
 func main() {
 	supportedUpdatedModes := []string{"Off", "Initial", "Recreate"}
-	var defaultVPAUpdateMode string
-	flag.StringVar(&defaultVPAUpdateMode, "default-vpa-update-mode", "Off",
-		fmt.Sprintf("The default update mode for the VPA instances. Must be one of: %s",
+	var defaultVpaUpdateMode string
+	flag.StringVar(&defaultVpaUpdateMode, "default-vpa-update-mode", "Off",
+		fmt.Sprintf("The default update mode for the vpa instances. Must be one of: %s",
 			strings.Join(supportedUpdatedModes, ",")))
 
 	supportedValues := []string{"RequestsOnly", "RequestsAndLimits"}
-	var defaultVPASupportedValues string
-	flag.StringVar(&defaultVPASupportedValues, "default-vpa-supported-values", "RequestsOnly",
+	var defaultVpaSupportedValues string
+	flag.StringVar(&defaultVpaSupportedValues, "default-vpa-supported-values", "RequestsOnly",
 		fmt.Sprintf("Controls which resource value should be autoscaled. Must be one of: %s",
 			strings.Join(supportedValues, ",")))
 	flag.Parse()
 
 	// Helm requires the 'Off' value to be quoted to avoid it being interpreted as a boolean.
-	defaultVPAUpdateMode = strings.Trim(defaultVPAUpdateMode, "\"")
-	switch defaultVPAUpdateMode {
+	defaultVpaUpdateMode = strings.Trim(defaultVpaUpdateMode, "\"")
+	switch defaultVpaUpdateMode {
 	case "Initial":
-		common.VPAUpdateMode = autoscaling.UpdateModeInitial
+		common.VpaUpdateMode = autoscaling.UpdateModeInitial
 	case "Recreate":
-		common.VPAUpdateMode = autoscaling.UpdateModeRecreate
+		common.VpaUpdateMode = autoscaling.UpdateModeRecreate
 	case "Off":
-		common.VPAUpdateMode = autoscaling.UpdateModeOff
+		common.VpaUpdateMode = autoscaling.UpdateModeOff
 	default:
 		fmt.Printf("unsupported update mode %s. Must be one of: %s",
-			defaultVPAUpdateMode,
+			defaultVpaUpdateMode,
 			strings.Join(supportedUpdatedModes, ","))
 		os.Exit(1)
 	}
 
-	switch defaultVPASupportedValues {
+	switch defaultVpaSupportedValues {
 	case "RequestsAndLimits":
-		common.VPAControlledValues = autoscaling.ContainerControlledValuesRequestsAndLimits
+		common.VpaControlledValues = autoscaling.ContainerControlledValuesRequestsAndLimits
 	case "RequestsOnly":
-		common.VPAControlledValues = autoscaling.ContainerControlledValuesRequestsOnly
+		common.VpaControlledValues = autoscaling.ContainerControlledValuesRequestsOnly
 	default:
 		fmt.Printf("supported values must be one of: %s", strings.Join(supportedValues, ","))
 		os.Exit(1)
@@ -88,7 +88,7 @@ func main() {
 
 	handleError(err, "unable to start manager")
 	handleError(controllers.SetupForAppsV1(mgr), "unable to setup apps/v1 controllers")
-	vpaController := controllers.VPAController{
+	vpaController := controllers.VpaController{
 		Client:  mgr.GetClient(),
 		Version: Version,
 	}

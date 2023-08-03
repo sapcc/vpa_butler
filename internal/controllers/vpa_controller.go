@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"strings"
 
 	"github.com/go-logr/logr"
 	"github.com/sapcc/vpa_butler/internal/common"
@@ -12,14 +13,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 )
 
-type VPAController struct {
+const (
+	annotationVpaButlerVersion = "cloud.sap/vpa-butler-version"
+)
+
+type VpaController struct {
 	client.Client
 	Log     logr.Logger
 	Scheme  *runtime.Scheme
 	Version string
 }
 
-func (v *VPAController) SetupWithManager(mgr ctrl.Manager) error {
+func (v *VpaController) SetupWithManager(mgr ctrl.Manager) error {
 	name := "vpa-controller"
 	v.Client = mgr.GetClient()
 	v.Log = mgr.GetLogger().WithName(name)
@@ -31,30 +36,30 @@ func (v *VPAController) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(v)
 }
 
-func (v *VPAController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	v.Log.Info("Reconciling VPA", "namespace", req.NamespacedName.Namespace, "name", req.NamespacedName.Name)
+func (v *VpaController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	v.Log.Info("Reconciling vpa", "namespace", req.NamespacedName.Namespace, "name", req.NamespacedName.Name)
 	var vpa = new(vpav1.VerticalPodAutoscaler)
 	if err := v.Get(ctx, req.NamespacedName, vpa); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	abort, err := v.cleanupServedVPA(ctx, vpa)
+	abort, err := v.cleanupServedVpa(ctx, vpa)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 	if abort || !common.ManagedByButler(vpa) {
 		return ctrl.Result{}, nil
 	}
-	if err := v.deleteOldVPA(ctx, vpa); err != nil {
+	if err := v.deleteOldVpa(ctx, vpa); err != nil {
 		return ctrl.Result{}, err
 	}
 
 	// patch version annotation
 	if v.Version != "" {
-		version, ok := vpa.Annotations[common.AnnotationVPAButlerVersion]
+		version, ok := vpa.Annotations[annotationVpaButlerVersion]
 		if !ok || version != v.Version {
 			original := vpa.DeepCopy()
-			vpa.Annotations[common.AnnotationVPAButlerVersion] = v.Version
+			vpa.Annotations[annotationVpaButlerVersion] = v.Version
 			err := v.Client.Patch(ctx, vpa, client.MergeFrom(original))
 			if err != nil {
 				return ctrl.Result{}, err
@@ -66,61 +71,81 @@ func (v *VPAController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	return ctrl.Result{}, nil
 }
 
-// When there is a hand-crafted VPA targeting the same object as a served VPA the served one needs to be deleted.
-// This functions returns true, when VPA currently being reconciled has been deleted.
-func (v *VPAController) cleanupServedVPA(ctx context.Context, reconcileVPA *vpav1.VerticalPodAutoscaler) (bool, error) {
-	v.Log.Info("Checking for deletion as a custom VPA was created",
-		"namespace", reconcileVPA.GetNamespace(), "name", reconcileVPA.GetName())
-	if reconcileVPA.Spec.TargetRef == nil {
+// When there is a hand-crafted vpa targeting the same object as a served vpa the served one needs to be deleted.
+// This functions returns true, when vpa currently being reconciled has been deleted.
+func (v *VpaController) cleanupServedVpa(ctx context.Context, reconcileVpa *vpav1.VerticalPodAutoscaler) (bool, error) {
+	v.Log.Info("Checking for deletion as a custom vpa was created",
+		"namespace", reconcileVpa.GetNamespace(), "name", reconcileVpa.GetName())
+	if reconcileVpa.Spec.TargetRef == nil {
 		return false, nil
 	}
 	var vpas = new(vpav1.VerticalPodAutoscalerList)
-	if err := v.List(ctx, vpas, client.InNamespace(reconcileVPA.GetNamespace())); err != nil {
+	if err := v.List(ctx, vpas, client.InNamespace(reconcileVpa.GetNamespace())); err != nil {
 		return false, err
 	}
 	// There are two cases to consider:
-	// 1. The reconciled VPA is the served VPA.
-	//    It gets deleted and we can early return as soon as any other VPA shares the same targetRef.
-	// 2. The reconciled VPA is the hand-crafted VPA.
-	//    If both VPAs compared within the are two different hand-crafted VPAs (which is still
+	// 1. The reconciled vpa is the served vpa.
+	//    It gets deleted and we can early return as soon as any other vpa shares the same targetRef.
+	// 2. The reconciled vpa is the hand-crafted vpa.
+	//    If both vpas compared within the are two different hand-crafted vpas (which is still
 	//    undefined behavior, but the butler does not care) no if applies and eventually the
-	//    hand-crafted reconciled VPA is compared to the served one. It gets deleted and we can
+	//    hand-crafted reconciled vpas is compared to the served one. It gets deleted and we can
 	//    return early.
 	for i := range vpas.Items {
 		vpa := vpas.Items[i]
-		if !common.EqualTarget(&vpa, reconcileVPA) || vpa.UID == reconcileVPA.UID {
+		if !equalTarget(&vpa, reconcileVpa) || vpa.UID == reconcileVpa.UID {
 			continue
 		}
 		if common.ManagedByButler(&vpa) {
 			if err := v.Delete(ctx, &vpa); err != nil {
 				return false, err
 			}
-			v.Log.Info("Deleted served VPA as a custom VPA was created",
+			v.Log.Info("Deleted served vpa as a custom vpa was created",
 				"namespace", vpa.GetNamespace(), "name", vpa.GetName())
 			return false, nil
 		}
-		if common.ManagedByButler(reconcileVPA) {
-			if err := v.Delete(ctx, reconcileVPA); err != nil {
+		if common.ManagedByButler(reconcileVpa) {
+			if err := v.Delete(ctx, reconcileVpa); err != nil {
 				return false, err
 			}
-			v.Log.Info("Deleted served VPA as a custom VPA was created",
-				"namespace", reconcileVPA.GetNamespace(), "name", reconcileVPA.GetName())
+			v.Log.Info("Deleted served vpa as a custom vpa was created",
+				"namespace", reconcileVpa.GetNamespace(), "name", reconcileVpa.GetName())
 			return true, nil
 		}
 	}
-	// When arriving here the cleanup the served VPA situation is sorted out.
-	// No information about, whether the reconciled VPA is served or hand-crafted.
+	// When arriving here the cleanup the served vpa situation is sorted out.
+	// No information about, whether the reconciled vpa is served or hand-crafted.
 	return false, nil
 }
 
 // Clean-up vpa resources with old naming schema.
-func (v *VPAController) deleteOldVPA(ctx context.Context, vpa *vpav1.VerticalPodAutoscaler) error {
-	if !common.IsNewNamingSchema(vpa.GetName()) {
+func (v *VpaController) deleteOldVpa(ctx context.Context, vpa *vpav1.VerticalPodAutoscaler) error {
+	if !isNewNamingSchema(vpa.GetName()) {
 		err := v.Delete(ctx, vpa)
 		if err != nil {
 			return err
 		}
-		v.Log.Info("Cleanup old VPA successful", "namespace", vpa.GetNamespace(), "name", vpa.GetName())
+		v.Log.Info("Cleanup old vpa successful", "namespace", vpa.GetNamespace(), "name", vpa.GetName())
 	}
 	return nil
+}
+
+func isNewNamingSchema(name string) bool {
+	suffixes := []string{"-daemonset", "-statefulset", "-deployment"}
+	for _, prefix := range suffixes {
+		if strings.HasSuffix(name, prefix) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func equalTarget(a, b *vpav1.VerticalPodAutoscaler) bool {
+	if a.Spec.TargetRef == nil || b.Spec.TargetRef == nil {
+		return false
+	}
+	return a.Spec.TargetRef.Name == b.Spec.TargetRef.Name &&
+		a.Spec.TargetRef.Kind == b.Spec.TargetRef.Kind &&
+		a.Spec.TargetRef.APIVersion == b.Spec.TargetRef.APIVersion
 }

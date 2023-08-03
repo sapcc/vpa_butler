@@ -27,6 +27,10 @@ lint: vendor
 test: lint
 	bash -c "source <($(GOPATH)/bin/setup-envtest use -p env); $(GOPATH)/bin/ginkgo --randomize-all ./..."
 
+cover: lint
+	bash -c "source <($(GOPATH)/bin/setup-envtest use -p env); $(GOPATH)/bin/ginkgo --randomize-all --coverpkg=github.com/sapcc/vpa_butler/... ./..."
+	go tool cover -html=coverprofile.out
+
 build:
 	docker build $(OPTS) -t $(IMAGE):$(VERSION) .
 

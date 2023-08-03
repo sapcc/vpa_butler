@@ -54,7 +54,7 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).ToNot(HaveOccurred())
 
-	err = (&controllers.VPAController{
+	err = (&controllers.VpaController{
 		Client:  k8sManager.GetClient(),
 		Log:     GinkgoLogr.WithName("vpa-controller"),
 		Scheme:  k8sManager.GetScheme(),
