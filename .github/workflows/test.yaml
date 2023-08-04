@@ -66,4 +66,9 @@ jobs:
 
       - name: Run tests
         run: |
-          make test -o lint
+          make cover -o lint
+
+      - name: Upload coverage results to coveralls
+        uses: shogo82148/actions-goveralls@v1
+        with:
+          path-to-profile: coverprofile.out
