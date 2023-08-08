@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/sapcc/vpa_butler/internal/controllers"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	autoscaling "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -27,28 +28,35 @@ var (
 	setupLog   = ctrl.Log.WithName("setup")
 	syncPeriod = 5 * time.Minute
 
-	Version string
+	Version                   string
+	defaultVpaUpdateMode      string
+	defaultVpaSupportedValues string
+	defaultMinAllowedMemory   string
+	defaultMinAllowedCPU      string
+	supportedUpdatedModes     = []string{"Off", "Initial", "Recreate"}
+	supportedValues           = []string{"RequestsOnly", "RequestsAndLimits"}
 )
 
 func init() {
 	_ = autoscaling.AddToScheme(scheme)
 	_ = clientgoscheme.AddToScheme(scheme)
-}
 
-func main() {
-	supportedUpdatedModes := []string{"Off", "Initial", "Recreate"}
-	var defaultVpaUpdateMode string
 	flag.StringVar(&defaultVpaUpdateMode, "default-vpa-update-mode", "Off",
 		fmt.Sprintf("The default update mode for the vpa instances. Must be one of: %s",
 			strings.Join(supportedUpdatedModes, ",")))
 
-	supportedValues := []string{"RequestsOnly", "RequestsAndLimits"}
-	var defaultVpaSupportedValues string
 	flag.StringVar(&defaultVpaSupportedValues, "default-vpa-supported-values", "RequestsOnly",
 		fmt.Sprintf("Controls which resource value should be autoscaled. Must be one of: %s",
 			strings.Join(supportedValues, ",")))
-	flag.Parse()
 
+	flag.StringVar(&defaultMinAllowedMemory, "default-min-allowed-memory", "48Mi",
+		"The default min allowed memory per container that the vpa can set")
+	flag.StringVar(&defaultMinAllowedCPU, "default-min-allowed-cpu", "50m",
+		"The default min allowed CPU per container that the vpa can set")
+}
+
+func main() {
+	flag.Parse()
 	// Helm requires the 'Off' value to be quoted to avoid it being interpreted as a boolean.
 	defaultVpaUpdateMode = strings.Trim(defaultVpaUpdateMode, "\"")
 	switch defaultVpaUpdateMode {
@@ -75,6 +83,9 @@ func main() {
 		os.Exit(1)
 	}
 
+	minAllowedCPU := resource.MustParse(defaultMinAllowedCPU)
+	minAllowedMemory := resource.MustParse(defaultMinAllowedMemory)
+
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 	setupLog.Info("starting")
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
@@ -87,7 +98,10 @@ func main() {
 	})
 
 	handleError(err, "unable to start manager")
-	handleError(controllers.SetupForAppsV1(mgr), "unable to setup apps/v1 controllers")
+	handleError(controllers.SetupForAppsV1(mgr, controllers.GenericControllerParams{
+		MinAllowedCPU:    minAllowedCPU,
+		MinAllowedMemory: minAllowedMemory,
+	}), "unable to setup apps/v1 controllers")
 	vpaController := controllers.VpaController{
 		Client:  mgr.GetClient(),
 		Version: Version,

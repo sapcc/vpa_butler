@@ -10,6 +10,7 @@ import (
 	"github.com/sapcc/vpa_butler/internal/controllers"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	vpav1 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -28,6 +29,9 @@ var (
 	k8sManager     ctrl.Manager
 	k8sClient      client.Client
 	stopController context.CancelFunc
+
+	testMinAllowedCPU    = resource.MustParse("100m")
+	testMinAllowedMemory = resource.MustParse("128Mi")
 )
 
 var _ = BeforeSuite(func() {
@@ -62,7 +66,10 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	Expect(controllers.SetupForAppsV1(k8sManager)).To(Succeed())
+	Expect(controllers.SetupForAppsV1(k8sManager, controllers.GenericControllerParams{
+		MinAllowedCPU:    testMinAllowedCPU,
+		MinAllowedMemory: testMinAllowedMemory,
+	})).To(Succeed())
 
 	go func() {
 		stopCtx, cancel := context.WithCancel(ctrl.SetupSignalHandler())

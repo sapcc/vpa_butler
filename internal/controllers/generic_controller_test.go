@@ -54,6 +54,13 @@ func expectVpa(name string) {
 		if mangedBy != common.AnnotationVpaButler {
 			return fmt.Errorf("vpa has wrong managed-by annotation")
 		}
+		minAllowed := vpa.Spec.ResourcePolicy.ContainerPolicies[0].MinAllowed
+		if !minAllowed.Cpu().Equal(testMinAllowedCPU) {
+			return fmt.Errorf("vpa minAllowed CPU does not match")
+		}
+		if !minAllowed.Memory().Equal(testMinAllowedMemory) {
+			return fmt.Errorf("vpa minAllowed memory does not match")
+		}
 		return nil
 	}).Should(Succeed())
 }

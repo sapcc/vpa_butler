@@ -11,10 +11,11 @@ import (
 	"github.com/sapcc/vpa_butler/internal/common"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscaling "k8s.io/api/autoscaling/v1"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	vpav1 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1"
@@ -30,9 +31,15 @@ const (
 	maxNameLength = 63
 )
 
+type GenericControllerParams struct {
+	MinAllowedCPU    resource.Quantity
+	MinAllowedMemory resource.Quantity
+}
+
 type GenericController struct {
 	client.Client
 	typeName string
+	params   GenericControllerParams
 	Log      logr.Logger
 	Scheme   *runtime.Scheme
 	instance client.Object
@@ -133,7 +140,7 @@ func (v *GenericController) reconcileVpa(ctx context.Context, vpaOwner client.Ob
 	if !ok {
 		return fmt.Errorf("failed to cast object to client.Object")
 	}
-	if err := configureVpa(v.Scheme, vpaOwner, vpa); err != nil {
+	if err := v.configureVpa(vpaOwner, vpa); err != nil {
 		return errors.Wrap(err, "mutating object failed")
 	}
 
@@ -153,7 +160,7 @@ func (v *GenericController) reconcileVpa(ctx context.Context, vpaOwner client.Ob
 	return nil
 }
 
-func configureVpa(scheme *runtime.Scheme, vpaOwner client.Object, vpa *vpav1.VerticalPodAutoscaler) error {
+func (v *GenericController) configureVpa(vpaOwner client.Object, vpa *vpav1.VerticalPodAutoscaler) error {
 	vpaSpec := &vpa.Spec
 	vpaSpec.TargetRef = &autoscaling.CrossVersionObjectReference{
 		Kind:       vpaOwner.GetObjectKind().GroupVersionKind().Kind,
@@ -164,13 +171,17 @@ func configureVpa(scheme *runtime.Scheme, vpaOwner client.Object, vpa *vpav1.Ver
 		UpdateMode: &common.VpaUpdateMode,
 	}
 
-	resourceList := []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory}
+	resourceList := []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory}
 	vpaSpec.ResourcePolicy = &vpav1.PodResourcePolicy{
 		ContainerPolicies: []vpav1.ContainerResourcePolicy{
 			{
 				ContainerName:       "*",
 				ControlledResources: &resourceList,
 				ControlledValues:    &common.VpaControlledValues,
+				MinAllowed: corev1.ResourceList{
+					corev1.ResourceCPU:    v.params.MinAllowedCPU,
+					corev1.ResourceMemory: v.params.MinAllowedMemory,
+				},
 			},
 		},
 	}
@@ -179,7 +190,7 @@ func configureVpa(scheme *runtime.Scheme, vpaOwner client.Object, vpa *vpav1.Ver
 	}
 	vpa.Annotations[common.AnnotationManagedBy] = common.AnnotationVpaButler
 
-	return controllerutil.SetOwnerReference(vpaOwner, vpa, scheme)
+	return controllerutil.SetOwnerReference(vpaOwner, vpa, v.Scheme)
 }
 
 func (v *GenericController) ensureVpaDeleted(ctx context.Context, vpaOwner client.Object) error {
@@ -204,9 +215,10 @@ func getVpaName(vpaOwner client.Object) string {
 	return fmt.Sprintf("%s-%s", name, kind)
 }
 
-func SetupForAppsV1(mgr ctrl.Manager) error {
+func SetupForAppsV1(mgr ctrl.Manager, params GenericControllerParams) error {
 	deploymentController := GenericController{
 		Client: mgr.GetClient(),
+		params: params,
 	}
 	err := deploymentController.SetupWithManager(mgr, &appsv1.Deployment{})
 	if err != nil {
@@ -214,6 +226,7 @@ func SetupForAppsV1(mgr ctrl.Manager) error {
 	}
 	daemonsetController := GenericController{
 		Client: mgr.GetClient(),
+		params: params,
 	}
 	err = daemonsetController.SetupWithManager(mgr, &appsv1.DaemonSet{})
 	if err != nil {
@@ -221,6 +234,7 @@ func SetupForAppsV1(mgr ctrl.Manager) error {
 	}
 	statefulSetController := GenericController{
 		Client: mgr.GetClient(),
+		params: params,
 	}
 	err = statefulSetController.SetupWithManager(mgr, &appsv1.StatefulSet{})
 	if err != nil {
