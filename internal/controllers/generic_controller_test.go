@@ -21,7 +21,10 @@ import (
 )
 
 const (
-	deploymentName string = "test-deployment"
+	deploymentName          string = "test-deployment"
+	statefulSetName         string = "test-statefulset"
+	daemonSetName           string = "test-daemonset"
+	deploymentCustomVpaName string = "test-deployment-custom-vpa"
 )
 
 var (
@@ -89,6 +92,27 @@ func makeDeployment() *appsv1.Deployment {
 	return deployment
 }
 
+func makeStatefulSet() *appsv1.StatefulSet {
+	statefulset := appsv1.StatefulSet{}
+	statefulset.Name = statefulSetName
+	statefulset.Namespace = metav1.NamespaceDefault
+	statefulset.Spec.Selector = &selector
+	statefulset.Spec.Template.ObjectMeta.Labels = labels
+	statefulset.Spec.Replicas = ptr.To[int32](1)
+	statefulset.Spec.Template.Spec.Containers = containers
+	return &statefulset
+}
+
+func makeDaemonSet() *appsv1.DaemonSet {
+	daemonset := &appsv1.DaemonSet{}
+	daemonset.Name = daemonSetName
+	daemonset.Namespace = metav1.NamespaceDefault
+	daemonset.Spec.Selector = &selector
+	daemonset.Spec.Template.ObjectMeta.Labels = labels
+	daemonset.Spec.Template.Spec.Containers = containers
+	return daemonset
+}
+
 var _ = Describe("GenericController", func() {
 
 	Context("when creating a deployment", func() {
@@ -134,21 +158,16 @@ var _ = Describe("GenericController", func() {
 	})
 
 	Context("when creating a statefulset", func() {
-		var statefulset appsv1.StatefulSet
+		var statefulset *appsv1.StatefulSet
 
 		BeforeEach(func() {
-			statefulset.Name = "test-statefulset"
-			statefulset.Namespace = metav1.NamespaceDefault
-			statefulset.Spec.Selector = &selector
-			statefulset.Spec.Template.ObjectMeta.Labels = labels
-			statefulset.Spec.Replicas = ptr.To[int32](1)
-			statefulset.Spec.Template.Spec.Containers = containers
-			Expect(k8sClient.Create(context.Background(), &statefulset)).To(Succeed())
+			statefulset = makeStatefulSet()
+			Expect(k8sClient.Create(context.Background(), statefulset)).To(Succeed())
 		})
 
 		AfterEach(func() {
 			deleteVpa("test-statefulset-statefulset")
-			Expect(k8sClient.Delete(context.Background(), &statefulset)).To(Succeed())
+			Expect(k8sClient.Delete(context.Background(), statefulset)).To(Succeed())
 		})
 
 		It("should create a vpa", func() {
@@ -157,20 +176,16 @@ var _ = Describe("GenericController", func() {
 	})
 
 	Context("when creating a daemonset", func() {
-		var daemonset appsv1.DaemonSet
+		var daemonset *appsv1.DaemonSet
 
 		BeforeEach(func() {
-			daemonset.Name = "test-daemonset"
-			daemonset.Namespace = metav1.NamespaceDefault
-			daemonset.Spec.Selector = &selector
-			daemonset.Spec.Template.ObjectMeta.Labels = labels
-			daemonset.Spec.Template.Spec.Containers = containers
-			Expect(k8sClient.Create(context.Background(), &daemonset)).To(Succeed())
+			daemonset = makeDaemonSet()
+			Expect(k8sClient.Create(context.Background(), daemonset)).To(Succeed())
 		})
 
 		AfterEach(func() {
 			deleteVpa("test-daemonset-daemonset")
-			Expect(k8sClient.Delete(context.Background(), &daemonset)).To(Succeed())
+			Expect(k8sClient.Delete(context.Background(), daemonset)).To(Succeed())
 		})
 
 		It("should create a vpa", func() {
@@ -184,7 +199,7 @@ var _ = Describe("GenericController", func() {
 
 		BeforeEach(func() {
 			vpa = &vpav1.VerticalPodAutoscaler{}
-			vpa.Name = "test-deployment-custom-vpa"
+			vpa.Name = deploymentCustomVpaName
 			vpa.Namespace = metav1.NamespaceDefault
 			vpa.Spec.TargetRef = &autoscalingv1.CrossVersionObjectReference{
 				Name:       deploymentName,
@@ -198,7 +213,7 @@ var _ = Describe("GenericController", func() {
 
 		AfterEach(func() {
 			Expect(k8sClient.Delete(context.Background(), deployment)).To(Succeed())
-			deleteVpa("test-deployment-custom-vpa")
+			deleteVpa(deploymentCustomVpaName)
 			deleteVpa("test-deployment-deployment")
 		})
 

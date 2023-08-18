@@ -71,6 +71,13 @@ var _ = BeforeSuite(func() {
 		MinAllowedMemory: testMinAllowedMemory,
 	})).To(Succeed())
 
+	Expect(k8sManager.Add(&controllers.VpaRunnable{
+		Client:       k8sManager.GetClient(),
+		Period:       100 * time.Millisecond,
+		JitterFactor: 1,
+		Log:          GinkgoLogr.WithName("vpa-runnable"),
+	})).To(Succeed())
+
 	go func() {
 		stopCtx, cancel := context.WithCancel(ctrl.SetupSignalHandler())
 		stopController = cancel

@@ -20,7 +20,9 @@ import (
 )
 
 const (
-	webhookPort = 9443
+	webhookPort       = 9443
+	vpaRunnablePeriod = 30 * time.Second
+	vpaRunnableJitter = 1.2
 )
 
 var (
@@ -107,6 +109,13 @@ func main() {
 		Version: Version,
 	}
 	handleError(vpaController.SetupWithManager(mgr), "unable to setup vpa controller")
+	vpaRunnable := controllers.VpaRunnable{
+		Client:       mgr.GetClient(),
+		Period:       vpaRunnablePeriod,
+		JitterFactor: vpaRunnableJitter,
+		Log:          mgr.GetLogger().WithName("vpa-runnable"),
+	}
+	handleError(mgr.Add(&vpaRunnable), "unable to add vpa runnable")
 	setupLog.Info("starting manager")
 	handleError(mgr.Start(ctrl.SetupSignalHandler()), "problem running manager")
 }
