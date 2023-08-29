@@ -6,7 +6,10 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/sapcc/vpa_butler/internal/common"
+	appsv1 "k8s.io/api/apps/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	vpav1 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -50,24 +53,15 @@ func (v *VpaController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	if abort || !common.ManagedByButler(vpa) {
 		return ctrl.Result{}, nil
 	}
+	if err := v.patchVersionAnnotation(ctx, vpa); err != nil {
+		return ctrl.Result{}, err
+	}
 	if err := v.deleteOldVpa(ctx, vpa); err != nil {
 		return ctrl.Result{}, err
 	}
-
-	// patch version annotation
-	if v.Version != "" {
-		version, ok := vpa.Annotations[annotationVpaButlerVersion]
-		if !ok || version != v.Version {
-			original := vpa.DeepCopy()
-			vpa.Annotations[annotationVpaButlerVersion] = v.Version
-			err := v.Client.Patch(ctx, vpa, client.MergeFrom(original))
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-			v.Log.Info("Patched version annotation", "namespace", vpa.GetNamespace(), "name", vpa.GetName())
-		}
+	if err := v.deleteOrphanedVpa(ctx, vpa); err != nil {
+		return ctrl.Result{}, err
 	}
-
 	return ctrl.Result{}, nil
 }
 
@@ -126,6 +120,48 @@ func (v *VpaController) deleteOldVpa(ctx context.Context, vpa *vpav1.VerticalPod
 			return err
 		}
 		v.Log.Info("Cleanup old vpa successful", "namespace", vpa.GetNamespace(), "name", vpa.GetName())
+	}
+	return nil
+}
+
+// Cleanup-up served Vpas, which target have been removed.
+// Compared to finalizers on the targets (deployments,...) this approach is more
+// lazy as the vpa needs to be reconciled, but it does not put finalizers on critical resources.
+func (v *VpaController) deleteOrphanedVpa(ctx context.Context, vpa *vpav1.VerticalPodAutoscaler) error {
+	if vpa.Spec.TargetRef == nil {
+		v.Log.Info("Deleting Vpa with orphaned target")
+		return v.Delete(ctx, vpa)
+	}
+	name := types.NamespacedName{Namespace: vpa.Namespace, Name: vpa.Spec.TargetRef.Name}
+	var obj client.Object
+	switch vpa.Spec.TargetRef.Kind {
+	case "Deployment":
+		obj = &appsv1.Deployment{}
+	case "StatefulSet":
+		obj = &appsv1.StatefulSet{}
+	case "DaemonSet":
+		obj = &appsv1.DaemonSet{}
+	}
+	err := v.Get(ctx, name, obj)
+	if errors.IsNotFound(err) {
+		v.Log.Info("Deleting Vpa with orphaned target")
+		return v.Delete(ctx, vpa)
+	}
+	return err
+}
+
+func (v *VpaController) patchVersionAnnotation(ctx context.Context, vpa *vpav1.VerticalPodAutoscaler) error {
+	if v.Version != "" {
+		version, ok := vpa.Annotations[annotationVpaButlerVersion]
+		if !ok || version != v.Version {
+			original := vpa.DeepCopy()
+			vpa.Annotations[annotationVpaButlerVersion] = v.Version
+			err := v.Client.Patch(ctx, vpa, client.MergeFrom(original))
+			if err != nil {
+				return err
+			}
+			v.Log.Info("Patched version annotation", "namespace", vpa.GetNamespace(), "name", vpa.GetName())
+		}
 	}
 	return nil
 }
