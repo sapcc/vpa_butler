@@ -89,6 +89,11 @@ func makeDeployment() *appsv1.Deployment {
 	deployment.Spec.Template.ObjectMeta.Labels = labels
 	deployment.Spec.Replicas = ptr.To[int32](1)
 	deployment.Spec.Template.Spec.Containers = containers
+	deployment.Spec.Template.Spec.Tolerations = []corev1.Toleration{{
+		Key:      corev1.TaintNodeNotReady,
+		Operator: corev1.TolerationOpExists,
+		Effect:   corev1.TaintEffectNoSchedule,
+	}}
 	return deployment
 }
 
@@ -100,6 +105,11 @@ func makeStatefulSet() *appsv1.StatefulSet {
 	statefulset.Spec.Template.ObjectMeta.Labels = labels
 	statefulset.Spec.Replicas = ptr.To[int32](1)
 	statefulset.Spec.Template.Spec.Containers = containers
+	statefulset.Spec.Template.Spec.Tolerations = []corev1.Toleration{{
+		Key:      corev1.TaintNodeNotReady,
+		Operator: corev1.TolerationOpExists,
+		Effect:   corev1.TaintEffectNoSchedule,
+	}}
 	return &statefulset
 }
 
@@ -110,6 +120,11 @@ func makeDaemonSet() *appsv1.DaemonSet {
 	daemonset.Spec.Selector = &selector
 	daemonset.Spec.Template.ObjectMeta.Labels = labels
 	daemonset.Spec.Template.Spec.Containers = containers
+	daemonset.Spec.Template.Spec.Tolerations = []corev1.Toleration{{
+		Key:      corev1.TaintNodeNotReady,
+		Operator: corev1.TolerationOpExists,
+		Effect:   corev1.TaintEffectNoSchedule,
+	}}
 	return daemonset
 }
 

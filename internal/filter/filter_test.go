@@ -48,3 +48,41 @@ var _ = Describe("NodeName", func() {
 	})
 
 })
+
+var _ = Describe("TaintToleration", func() {
+
+	It("keeps nodes if they have no taints", func() {
+		Expect(filter.TaintToleration(filter.TargetedVpa{}, []corev1.Node{{}})).To(HaveLen(1))
+	})
+
+	It("removes nodes if the have a taint and the pod no toleration", func() {
+		Expect(filter.TaintToleration(filter.TargetedVpa{}, []corev1.Node{{
+			Spec: corev1.NodeSpec{
+				Taints: []corev1.Taint{{
+					Key:    corev1.TaintNodeNotReady,
+					Effect: corev1.TaintEffectNoExecute,
+				}},
+			},
+		}})).To(HaveLen(0))
+	})
+
+	It("keeps nodes if they are tainted but pods have a matching toleration", func() {
+		Expect(filter.TaintToleration(filter.TargetedVpa{
+			PodSpec: corev1.PodSpec{
+				Tolerations: []corev1.Toleration{{
+					Key:      corev1.TaintNodeNotReady,
+					Effect:   corev1.TaintEffectNoExecute,
+					Operator: corev1.TolerationOpExists,
+				}},
+			},
+		}, []corev1.Node{{
+			Spec: corev1.NodeSpec{
+				Taints: []corev1.Taint{{
+					Key:    corev1.TaintNodeNotReady,
+					Effect: corev1.TaintEffectNoExecute,
+				}},
+			},
+		}})).To(HaveLen(1))
+	})
+
+})
