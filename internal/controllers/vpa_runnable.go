@@ -7,10 +7,10 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/sapcc/vpa_butler/internal/common"
+	"github.com/sapcc/vpa_butler/internal/filter"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	vpav1 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1"
@@ -32,12 +32,6 @@ type VpaRunnable struct {
 	Log          logr.Logger
 }
 
-type targetedVpa struct {
-	vpa      *vpav1.VerticalPodAutoscaler
-	podSpec  corev1.PodSpec
-	selector metav1.LabelSelector
-}
-
 func (v *VpaRunnable) Start(ctx context.Context) error {
 	wait.JitterUntilWithContext(ctx, v.reconcile, v.Period, v.JitterFactor, false)
 	return nil
@@ -56,7 +50,7 @@ func (v *VpaRunnable) reconcile(ctx context.Context) {
 		v.Log.Error(err, "failed to list vpas to determine maximum allowed resources")
 		return
 	}
-	targetedVpas := make([]targetedVpa, 0)
+	targetedVpas := make([]filter.TargetedVpa, 0)
 	for i := range vpas.Items {
 		current := vpas.Items[i]
 		if common.ManagedByButler(&current) {
@@ -68,32 +62,33 @@ func (v *VpaRunnable) reconcile(ctx context.Context) {
 			targetedVpas = append(targetedVpas, targeted)
 		}
 	}
+	schedulable := filter.Schedulable(nodes.Items)
 	for _, target := range targetedVpas {
-		viable := evaluateFilters(target, nodes.Items)
+		viable := filter.Evaluate(target, schedulable)
 		if len(viable) == 0 {
 			return
 		}
 		largest := maxByMemory(viable)
-		containers := int64(len(target.podSpec.Containers))
+		containers := int64(len(target.PodSpec.Containers))
 		// distribute a fraction of maximum capacity evenly across containers
 		cpuScaled := scaleQuantity(largest.Status.Allocatable.Cpu(), ScaleMultiplier, ScaleDivisor*containers)
 		memScaled := scaleQuantity(largest.Status.Allocatable.Memory(), ScaleMultiplier, ScaleDivisor*containers)
 		err := v.patchMaxRessources(ctx, patchParams{
-			vpa:    target.vpa,
+			vpa:    target.Vpa,
 			cpu:    *cpuScaled,
 			memory: *memScaled,
 		})
 		if err != nil {
 			v.Log.Error(err, "failed to set maximum allowed resources for vpa",
-				"name", target.vpa.Name, "namespace", target.vpa.Namespace)
+				"name", target.Vpa.Name, "namespace", target.Vpa.Namespace)
 			continue
 		}
 	}
 }
 
-func (v *VpaRunnable) extractTarget(ctx context.Context, vpa *vpav1.VerticalPodAutoscaler) (targetedVpa, error) {
+func (v *VpaRunnable) extractTarget(ctx context.Context, vpa *vpav1.VerticalPodAutoscaler) (filter.TargetedVpa, error) {
 	if vpa.Spec.TargetRef == nil {
-		return targetedVpa{}, fmt.Errorf("vpa %s/%s has nil target ref", vpa.Namespace, vpa.Name)
+		return filter.TargetedVpa{}, fmt.Errorf("vpa %s/%s has nil target ref", vpa.Namespace, vpa.Name)
 	}
 	ref := *vpa.Spec.TargetRef
 	switch ref.Kind {
@@ -101,40 +96,40 @@ func (v *VpaRunnable) extractTarget(ctx context.Context, vpa *vpav1.VerticalPodA
 		var deployment appsv1.Deployment
 		err := v.Client.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: vpa.Namespace}, &deployment)
 		if err != nil {
-			return targetedVpa{}, fmt.Errorf("failed to fetch target %s/%s of kind %s for vpa",
+			return filter.TargetedVpa{}, fmt.Errorf("failed to fetch target %s/%s of kind %s for vpa",
 				vpa.Namespace, ref.Name, ref.Kind)
 		}
-		return targetedVpa{
-			vpa:      vpa,
-			podSpec:  deployment.Spec.Template.Spec,
-			selector: *deployment.Spec.Selector,
+		return filter.TargetedVpa{
+			Vpa:      vpa,
+			PodSpec:  deployment.Spec.Template.Spec,
+			Selector: *deployment.Spec.Selector,
 		}, nil
 	case "StatefulSet":
 		var sts appsv1.StatefulSet
 		err := v.Client.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: vpa.Namespace}, &sts)
 		if err != nil {
-			return targetedVpa{}, fmt.Errorf("failed to fetch target %s/%s of kind %s for vpa",
+			return filter.TargetedVpa{}, fmt.Errorf("failed to fetch target %s/%s of kind %s for vpa",
 				vpa.Namespace, ref.Name, ref.Kind)
 		}
-		return targetedVpa{
-			vpa:      vpa,
-			podSpec:  sts.Spec.Template.Spec,
-			selector: *sts.Spec.Selector,
+		return filter.TargetedVpa{
+			Vpa:      vpa,
+			PodSpec:  sts.Spec.Template.Spec,
+			Selector: *sts.Spec.Selector,
 		}, nil
 	case "DaemonSet":
 		var ds appsv1.DaemonSet
 		err := v.Client.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: vpa.Namespace}, &ds)
 		if err != nil {
-			return targetedVpa{}, fmt.Errorf("failed to fetch target %s/%s of kind %s for vpa",
+			return filter.TargetedVpa{}, fmt.Errorf("failed to fetch target %s/%s of kind %s for vpa",
 				vpa.Namespace, ref.Name, ref.Kind)
 		}
-		return targetedVpa{
-			vpa:      vpa,
-			podSpec:  ds.Spec.Template.Spec,
-			selector: *ds.Spec.Selector,
+		return filter.TargetedVpa{
+			Vpa:      vpa,
+			PodSpec:  ds.Spec.Template.Spec,
+			Selector: *ds.Spec.Selector,
 		}, nil
 	}
-	return targetedVpa{}, fmt.Errorf("unknown target kind %s for vpa %s/%s encountered",
+	return filter.TargetedVpa{}, fmt.Errorf("unknown target kind %s for vpa %s/%s encountered",
 		ref.Kind, vpa.Namespace, vpa.Name)
 }
 
@@ -158,29 +153,6 @@ func (v *VpaRunnable) patchMaxRessources(ctx context.Context, params patchParams
 		corev1.ResourceMemory: params.memory,
 	}
 	return v.Client.Patch(ctx, vpa, client.MergeFrom(unmodified))
-}
-
-type nodeFilter func(target targetedVpa, nodes []corev1.Node) []corev1.Node
-
-func filterNodeName(target targetedVpa, nodes []corev1.Node) []corev1.Node {
-	if target.podSpec.NodeName == "" {
-		return nodes
-	}
-	for _, node := range nodes {
-		if node.Name == target.podSpec.NodeName {
-			return []corev1.Node{node}
-		}
-	}
-	return []corev1.Node{}
-}
-
-func evaluateFilters(target targetedVpa, nodes []corev1.Node) []corev1.Node {
-	filters := []nodeFilter{filterNodeName}
-	next := nodes
-	for _, filter := range filters {
-		next = filter(target, next)
-	}
-	return next
 }
 
 func maxByMemory(nodes []corev1.Node) corev1.Node {
