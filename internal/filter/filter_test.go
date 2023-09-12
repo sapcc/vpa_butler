@@ -6,6 +6,7 @@ import (
 	"github.com/sapcc/vpa_butler/internal/filter"
 
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var _ = Describe("Schedulable", func() {
@@ -42,7 +43,8 @@ var _ = Describe("NodeName", func() {
 		node2.Name = "node2"
 		nodes := []corev1.Node{node1, node2}
 		target := filter.TargetedVpa{PodSpec: corev1.PodSpec{NodeName: "node2"}}
-		result := filter.NodeName(target, nodes)
+		result, err := filter.NodeName(target, nodes)
+		Expect(err).To(Succeed())
 		Expect(result).To(HaveLen(1))
 		Expect(result[0].Name).To(Equal("node2"))
 	})
@@ -83,6 +85,44 @@ var _ = Describe("TaintToleration", func() {
 				}},
 			},
 		}})).To(HaveLen(1))
+	})
+
+})
+
+var _ = Describe("NodeAffinity", func() {
+
+	affinity := &corev1.Affinity{
+		NodeAffinity: &corev1.NodeAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+				NodeSelectorTerms: []corev1.NodeSelectorTerm{
+					{
+						MatchExpressions: []corev1.NodeSelectorRequirement{
+							{
+								Key:      "required",
+								Operator: corev1.NodeSelectorOpExists,
+								Values:   []string{},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	It("keeps nodes if pod has no affinities", func() {
+		Expect(filter.NodeAffinity(filter.TargetedVpa{}, []corev1.Node{{}})).To(HaveLen(1))
+	})
+
+	It("filters node if an affinity does not match", func() {
+		Expect(filter.NodeAffinity(filter.TargetedVpa{PodSpec: corev1.PodSpec{
+			Affinity: affinity,
+		}}, []corev1.Node{{}})).To(HaveLen(0))
+	})
+
+	It("keeps nodes if an affinity matches", func() {
+		Expect(filter.NodeAffinity(filter.TargetedVpa{PodSpec: corev1.PodSpec{
+			Affinity: affinity,
+		}}, []corev1.Node{{ObjectMeta: v1.ObjectMeta{Labels: map[string]string{"required": "yes"}}}})).To(HaveLen(1))
 	})
 
 })

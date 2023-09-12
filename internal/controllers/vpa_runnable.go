@@ -64,7 +64,10 @@ func (v *VpaRunnable) reconcile(ctx context.Context) {
 	}
 	schedulable := filter.Schedulable(nodes.Items)
 	for _, target := range targetedVpas {
-		viable := filter.Evaluate(target, schedulable)
+		viable, err := filter.Evaluate(target, schedulable)
+		if err != nil {
+			v.Log.Error(err, "failed to determine valid nodes", "namespace", target.Vpa.Namespace, "name", target.Vpa.Name)
+		}
 		if len(viable) == 0 {
 			return
 		}
@@ -73,7 +76,7 @@ func (v *VpaRunnable) reconcile(ctx context.Context) {
 		// distribute a fraction of maximum capacity evenly across containers
 		cpuScaled := scaleQuantity(largest.Status.Allocatable.Cpu(), ScaleMultiplier, ScaleDivisor*containers)
 		memScaled := scaleQuantity(largest.Status.Allocatable.Memory(), ScaleMultiplier, ScaleDivisor*containers)
-		err := v.patchMaxRessources(ctx, patchParams{
+		err = v.patchMaxRessources(ctx, patchParams{
 			vpa:    target.Vpa,
 			cpu:    *cpuScaled,
 			memory: *memScaled,

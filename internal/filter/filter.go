@@ -5,6 +5,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	vpav1 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1"
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
+	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 )
 
 func Schedulable(nodes []corev1.Node) []corev1.Node {
@@ -23,21 +24,21 @@ type TargetedVpa struct {
 	Selector metav1.LabelSelector
 }
 
-type NodeFilter func(target TargetedVpa, nodes []corev1.Node) []corev1.Node
+type NodeFilter func(target TargetedVpa, nodes []corev1.Node) ([]corev1.Node, error)
 
-func NodeName(target TargetedVpa, nodes []corev1.Node) []corev1.Node {
+func NodeName(target TargetedVpa, nodes []corev1.Node) ([]corev1.Node, error) {
 	if target.PodSpec.NodeName == "" {
-		return nodes
+		return nodes, nil
 	}
 	for _, node := range nodes {
 		if node.Name == target.PodSpec.NodeName {
-			return []corev1.Node{node}
+			return []corev1.Node{node}, nil
 		}
 	}
-	return []corev1.Node{}
+	return []corev1.Node{}, nil
 }
 
-func TaintToleration(target TargetedVpa, nodes []corev1.Node) []corev1.Node {
+func TaintToleration(target TargetedVpa, nodes []corev1.Node) ([]corev1.Node, error) {
 	doNotScheduleTaintsFilterFunc := func(t *corev1.Taint) bool {
 		// PodToleratesNodeTaints is only interested in NoSchedule and NoExecute taints.
 		return t.Effect == corev1.TaintEffectNoSchedule || t.Effect == corev1.TaintEffectNoExecute
@@ -53,14 +54,34 @@ func TaintToleration(target TargetedVpa, nodes []corev1.Node) []corev1.Node {
 			tolerated = append(tolerated, node)
 		}
 	}
-	return tolerated
+	return tolerated, nil
 }
 
-func Evaluate(target TargetedVpa, nodes []corev1.Node) []corev1.Node {
+func NodeAffinity(target TargetedVpa, nodes []corev1.Node) ([]corev1.Node, error) {
+	required := nodeaffinity.GetRequiredNodeAffinity(&corev1.Pod{Spec: target.PodSpec})
+	matched := make([]corev1.Node, 0)
+	for i := range nodes {
+		current := nodes[i]
+		matches, err := required.Match(&current)
+		if err != nil {
+			return nil, err
+		}
+		if matches {
+			matched = append(matched, current)
+		}
+	}
+	return matched, nil
+}
+
+func Evaluate(target TargetedVpa, nodes []corev1.Node) ([]corev1.Node, error) {
 	filters := []NodeFilter{NodeName, TaintToleration}
 	next := nodes
 	for _, filter := range filters {
-		next = filter(target, next)
+		var err error
+		next, err = filter(target, next)
+		if err != nil {
+			return nil, err
+		}
 	}
-	return next
+	return next, nil
 }
