@@ -1,5 +1,6 @@
-FROM keppel.eu-de-2.cloud.sap/ccloud-dockerhub-mirror/library/golang:1.19 as builder
+FROM keppel.eu-de-2.cloud.sap/ccloud-dockerhub-mirror/library/golang:1.21 as builder
 
+ENV GOTOOLCHAIN=local
 WORKDIR /workspace
 COPY . .
 RUN make all
