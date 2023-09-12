@@ -8,8 +8,8 @@ resources:
     type: docker-image
     check_every: 24h
     source:
-      username: ((auth_from_file.docker.keppel-dhcp-controlplane.user))
-      password: ((auth_from_file.docker.keppel-dhcp-controlplane.password))
+      username: ((registry-user/keppel-ccloud.username))
+      password: ((registry-user/keppel-ccloud.password))
       repository: keppel.eu-de-1.cloud.sap/ccloud/vpa_butler
       tag: latest
 
