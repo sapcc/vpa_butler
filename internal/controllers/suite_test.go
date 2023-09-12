@@ -72,10 +72,11 @@ var _ = BeforeSuite(func() {
 	})).To(Succeed())
 
 	Expect(k8sManager.Add(&controllers.VpaRunnable{
-		Client:       k8sManager.GetClient(),
-		Period:       100 * time.Millisecond,
-		JitterFactor: 1,
-		Log:          GinkgoLogr.WithName("vpa-runnable"),
+		Client:          k8sManager.GetClient(),
+		Period:          100 * time.Millisecond,
+		JitterFactor:    1,
+		CapacityPercent: 90,
+		Log:             GinkgoLogr.WithName("vpa-runnable"),
 	})).To(Succeed())
 
 	go func() {

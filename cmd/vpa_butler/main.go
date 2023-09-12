@@ -23,6 +23,9 @@ const (
 	webhookPort       = 9443
 	vpaRunnablePeriod = 30 * time.Second
 	vpaRunnableJitter = 1.2
+	// 72 is not too high can be divided without remainder
+	// by 1,2,3 and 4 containers within a pod.
+	defaultCapacityPercent = 72
 )
 
 var (
@@ -37,6 +40,7 @@ var (
 	defaultMinAllowedCPU      string
 	supportedUpdatedModes     = []string{"Off", "Initial", "Recreate"}
 	supportedValues           = []string{"RequestsOnly", "RequestsAndLimits"}
+	capacityPercent           int64
 )
 
 func init() {
@@ -55,35 +59,13 @@ func init() {
 		"The default min allowed memory per container that the vpa can set")
 	flag.StringVar(&defaultMinAllowedCPU, "default-min-allowed-cpu", "50m",
 		"The default min allowed CPU per container that the vpa can set")
+	flag.Int64Var(&capacityPercent, "capacity-percent", defaultCapacityPercent,
+		"percentage of the largest viable node capacity to be set as max resources on the VPA object")
 }
 
 func main() {
 	flag.Parse()
-	// Helm requires the 'Off' value to be quoted to avoid it being interpreted as a boolean.
-	defaultVpaUpdateMode = strings.Trim(defaultVpaUpdateMode, "\"")
-	switch defaultVpaUpdateMode {
-	case "Initial":
-		common.VpaUpdateMode = autoscaling.UpdateModeInitial
-	case "Recreate":
-		common.VpaUpdateMode = autoscaling.UpdateModeRecreate
-	case "Off":
-		common.VpaUpdateMode = autoscaling.UpdateModeOff
-	default:
-		fmt.Printf("unsupported update mode %s. Must be one of: %s",
-			defaultVpaUpdateMode,
-			strings.Join(supportedUpdatedModes, ","))
-		os.Exit(1)
-	}
-
-	switch defaultVpaSupportedValues {
-	case "RequestsAndLimits":
-		common.VpaControlledValues = autoscaling.ContainerControlledValuesRequestsAndLimits
-	case "RequestsOnly":
-		common.VpaControlledValues = autoscaling.ContainerControlledValuesRequestsOnly
-	default:
-		fmt.Printf("supported values must be one of: %s", strings.Join(supportedValues, ","))
-		os.Exit(1)
-	}
+	setGlobals()
 
 	minAllowedCPU := resource.MustParse(defaultMinAllowedCPU)
 	minAllowedMemory := resource.MustParse(defaultMinAllowedMemory)
@@ -110,14 +92,43 @@ func main() {
 	}
 	handleError(vpaController.SetupWithManager(mgr), "unable to setup vpa controller")
 	vpaRunnable := controllers.VpaRunnable{
-		Client:       mgr.GetClient(),
-		Period:       vpaRunnablePeriod,
-		JitterFactor: vpaRunnableJitter,
-		Log:          mgr.GetLogger().WithName("vpa-runnable"),
+		Client:          mgr.GetClient(),
+		Period:          vpaRunnablePeriod,
+		JitterFactor:    vpaRunnableJitter,
+		CapacityPercent: capacityPercent,
+		Log:             mgr.GetLogger().WithName("vpa-runnable"),
 	}
 	handleError(mgr.Add(&vpaRunnable), "unable to add vpa runnable")
 	setupLog.Info("starting manager")
 	handleError(mgr.Start(ctrl.SetupSignalHandler()), "problem running manager")
+}
+
+func setGlobals() {
+	// Helm requires the 'Off' value to be quoted to avoid it being interpreted as a boolean.
+	defaultVpaUpdateMode = strings.Trim(defaultVpaUpdateMode, "\"")
+	switch defaultVpaUpdateMode {
+	case "Initial":
+		common.VpaUpdateMode = autoscaling.UpdateModeInitial
+	case "Recreate":
+		common.VpaUpdateMode = autoscaling.UpdateModeRecreate
+	case "Off":
+		common.VpaUpdateMode = autoscaling.UpdateModeOff
+	default:
+		fmt.Printf("unsupported update mode %s. Must be one of: %s",
+			defaultVpaUpdateMode,
+			strings.Join(supportedUpdatedModes, ","))
+		os.Exit(1)
+	}
+
+	switch defaultVpaSupportedValues {
+	case "RequestsAndLimits":
+		common.VpaControlledValues = autoscaling.ContainerControlledValuesRequestsAndLimits
+	case "RequestsOnly":
+		common.VpaControlledValues = autoscaling.ContainerControlledValuesRequestsOnly
+	default:
+		fmt.Printf("supported values must be one of: %s", strings.Join(supportedValues, ","))
+		os.Exit(1)
+	}
 }
 
 func handleError(err error, message string) {

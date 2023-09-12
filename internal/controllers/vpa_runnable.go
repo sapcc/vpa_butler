@@ -17,19 +17,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const (
-	ScaleMultiplier int64 = 9
-	ScaleDivisor    int64 = 10
-)
+const scaleDivisor int64 = 100
 
 // VpaRunnable is responsible for setting the maximum allowed resources
 // of a served Vpa. As all served Vpas have to evaluated against all nodes
 // we fetch the Vpas, their target and the nodes only once.
 type VpaRunnable struct {
 	client.Client
-	Period       time.Duration
-	JitterFactor float64
-	Log          logr.Logger
+	Period          time.Duration
+	JitterFactor    float64
+	CapacityPercent int64
+	Log             logr.Logger
 }
 
 func (v *VpaRunnable) Start(ctx context.Context) error {
@@ -74,8 +72,8 @@ func (v *VpaRunnable) reconcile(ctx context.Context) {
 		largest := maxByMemory(viable)
 		containers := int64(len(target.PodSpec.Containers))
 		// distribute a fraction of maximum capacity evenly across containers
-		cpuScaled := scaleQuantity(largest.Status.Allocatable.Cpu(), ScaleMultiplier, ScaleDivisor*containers)
-		memScaled := scaleQuantity(largest.Status.Allocatable.Memory(), ScaleMultiplier, ScaleDivisor*containers)
+		cpuScaled := scaleQuantity(largest.Status.Allocatable.Cpu(), v.CapacityPercent/containers)
+		memScaled := scaleQuantity(largest.Status.Allocatable.Memory(), v.CapacityPercent/containers)
 		err = v.patchMaxRessources(ctx, patchParams{
 			vpa:    target.Vpa,
 			cpu:    *cpuScaled,
@@ -168,6 +166,6 @@ func maxByMemory(nodes []corev1.Node) corev1.Node {
 	return maxNode
 }
 
-func scaleQuantity(q *resource.Quantity, multiplier int64, divisor int64) *resource.Quantity {
-	return resource.NewQuantity(q.Value()*multiplier/divisor, q.Format)
+func scaleQuantity(q *resource.Quantity, percent int64) *resource.Quantity {
+	return resource.NewQuantity(q.Value()*percent/scaleDivisor, q.Format)
 }
