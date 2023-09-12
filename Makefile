@@ -1,7 +1,7 @@
 DATE    = $(shell date +%Y%m%d%H%M)
 IMAGE   ?= keppel.eu-de-1.cloud.sap/ccloud/vpa_butler
 VERSION ?= v0.1.0
-GOOS    ?= $(shell go env | grep GOOS | cut -d'"' -f2)
+GOOS    ?= $(shell go env | grep GOOS | cut -d"'" -f2)
 BINARY  := vpa_butler
 OPTS    ?=
 
