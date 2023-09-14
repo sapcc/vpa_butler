@@ -7,22 +7,15 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
-	"github.com/pkg/errors"
 	"github.com/sapcc/vpa_butler/internal/common"
 	appsv1 "k8s.io/api/apps/v1"
-	autoscaling "k8s.io/api/autoscaling/v1"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	vpav1 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 const (
@@ -31,15 +24,9 @@ const (
 	maxNameLength = 63
 )
 
-type GenericControllerParams struct {
-	MinAllowedCPU    resource.Quantity
-	MinAllowedMemory resource.Quantity
-}
-
 type GenericController struct {
 	client.Client
 	typeName string
-	params   GenericControllerParams
 	Log      logr.Logger
 	Scheme   *runtime.Scheme
 	instance client.Object
@@ -68,11 +55,6 @@ func (v *GenericController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	v.Log.Info("Reconciling potential vpa target",
-		"namespace", instance.GetNamespace(),
-		"name", instance.GetName(),
-		"kind", instance.GetObjectKind().GroupVersionKind().Kind,
-	)
 	serve, err := v.shouldServeVpa(ctx, instance)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -81,11 +63,18 @@ func (v *GenericController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		err = v.ensureVpaDeleted(ctx, instance)
 		return ctrl.Result{}, err
 	}
-
-	if v.reconcileVpa(ctx, instance) != nil {
-		return ctrl.Result{}, err
+	var vpa = new(vpav1.VerticalPodAutoscaler)
+	vpa.Namespace = instance.GetNamespace()
+	vpa.Name = getVpaName(instance)
+	if err := v.Client.Get(ctx, client.ObjectKeyFromObject(vpa), vpa); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return ctrl.Result{}, err
+		}
+		// vpa does not exist so create it
+		// set off here, as the vpa is to be fully configured by the VpaController
+		common.ConfigureVpaBaseline(vpa, instance, vpav1.UpdateModeOff)
+		return ctrl.Result{}, v.Client.Create(ctx, vpa)
 	}
-
 	return ctrl.Result{}, nil
 }
 
@@ -116,83 +105,6 @@ func (v *GenericController) shouldServeVpa(ctx context.Context, vpaOwner client.
 	return true, nil
 }
 
-func (v *GenericController) reconcileVpa(ctx context.Context, vpaOwner client.Object) error {
-	var vpa = new(vpav1.VerticalPodAutoscaler)
-	vpa.Namespace = vpaOwner.GetNamespace()
-	vpa.Name = getVpaName(vpaOwner)
-	exists := true
-	if err := v.Client.Get(ctx, client.ObjectKeyFromObject(vpa), vpa); err != nil {
-		// Return any other error.
-		if !apierrors.IsNotFound(err) {
-			return err
-		}
-		exists = false
-	}
-
-	if o, err := meta.Accessor(vpa); err == nil {
-		if o.GetDeletionTimestamp() != nil {
-			return fmt.Errorf("the resource %s/%s already exists but is marked for deletion",
-				o.GetNamespace(), o.GetName())
-		}
-	}
-
-	before, ok := vpa.DeepCopyObject().(client.Object)
-	if !ok {
-		return fmt.Errorf("failed to cast object to client.Object")
-	}
-	if err := v.configureVpa(vpaOwner, vpa); err != nil {
-		return errors.Wrap(err, "mutating object failed")
-	}
-
-	if !exists {
-		v.Log.Info("Creating vpa", "name", vpa.Name, "namespace", vpa.Namespace)
-		return v.Client.Create(ctx, vpa)
-	}
-
-	if equality.Semantic.DeepEqual(before, vpa) {
-		return nil
-	}
-	patch := client.MergeFrom(before)
-	v.Log.Info("Patching vpa", "name", vpa.Name, "namespace", vpa.Namespace)
-	if err := v.Client.Patch(ctx, vpa, patch); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (v *GenericController) configureVpa(vpaOwner client.Object, vpa *vpav1.VerticalPodAutoscaler) error {
-	vpaSpec := &vpa.Spec
-	vpaSpec.TargetRef = &autoscaling.CrossVersionObjectReference{
-		Kind:       vpaOwner.GetObjectKind().GroupVersionKind().Kind,
-		Name:       vpaOwner.GetName(),
-		APIVersion: vpaOwner.GetObjectKind().GroupVersionKind().Version,
-	}
-	vpaSpec.UpdatePolicy = &vpav1.PodUpdatePolicy{
-		UpdateMode: &common.VpaUpdateMode,
-	}
-
-	resourceList := []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory}
-	vpaSpec.ResourcePolicy = &vpav1.PodResourcePolicy{
-		ContainerPolicies: []vpav1.ContainerResourcePolicy{
-			{
-				ContainerName:       "*",
-				ControlledResources: &resourceList,
-				ControlledValues:    &common.VpaControlledValues,
-				MinAllowed: corev1.ResourceList{
-					corev1.ResourceCPU:    v.params.MinAllowedCPU,
-					corev1.ResourceMemory: v.params.MinAllowedMemory,
-				},
-			},
-		},
-	}
-	if vpa.Annotations == nil {
-		vpa.Annotations = make(map[string]string, 0)
-	}
-	vpa.Annotations[common.AnnotationManagedBy] = common.AnnotationVpaButler
-
-	return controllerutil.SetOwnerReference(vpaOwner, vpa, v.Scheme)
-}
-
 func (v *GenericController) ensureVpaDeleted(ctx context.Context, vpaOwner client.Object) error {
 	var vpa vpav1.VerticalPodAutoscaler
 	ref := types.NamespacedName{Namespace: vpaOwner.GetNamespace(), Name: getVpaName(vpaOwner)}
@@ -215,10 +127,9 @@ func getVpaName(vpaOwner client.Object) string {
 	return fmt.Sprintf("%s-%s", name, kind)
 }
 
-func SetupForAppsV1(mgr ctrl.Manager, params GenericControllerParams) error {
+func SetupForAppsV1(mgr ctrl.Manager) error {
 	deploymentController := GenericController{
 		Client: mgr.GetClient(),
-		params: params,
 	}
 	err := deploymentController.SetupWithManager(mgr, &appsv1.Deployment{})
 	if err != nil {
@@ -226,7 +137,6 @@ func SetupForAppsV1(mgr ctrl.Manager, params GenericControllerParams) error {
 	}
 	daemonsetController := GenericController{
 		Client: mgr.GetClient(),
-		params: params,
 	}
 	err = daemonsetController.SetupWithManager(mgr, &appsv1.DaemonSet{})
 	if err != nil {
@@ -234,7 +144,6 @@ func SetupForAppsV1(mgr ctrl.Manager, params GenericControllerParams) error {
 	}
 	statefulSetController := GenericController{
 		Client: mgr.GetClient(),
-		params: params,
 	}
 	err = statefulSetController.SetupWithManager(mgr, &appsv1.StatefulSet{})
 	if err != nil {

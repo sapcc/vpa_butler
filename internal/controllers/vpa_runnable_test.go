@@ -7,6 +7,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/sapcc/vpa_butler/internal/common"
+	"github.com/sapcc/vpa_butler/internal/controllers"
 
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
@@ -34,6 +35,9 @@ func expectMaxResources(name, cpu, mem string) {
 		}
 		if mangedBy != common.AnnotationVpaButler {
 			return fmt.Errorf("vpa has wrong managed-by annotation")
+		}
+		if vpa.Spec.ResourcePolicy == nil {
+			return fmt.Errorf("vpa resource policy is nil")
 		}
 		if len(vpa.Spec.ResourcePolicy.ContainerPolicies) != 1 {
 			return fmt.Errorf("vpa has wrong amount of container policies")
@@ -129,7 +133,7 @@ var _ = Describe("VpaRunnable", func() {
 			vpa.Namespace = metav1.NamespaceDefault
 			vpa.Spec.TargetRef = &autoscalingv1.CrossVersionObjectReference{
 				Name:       deploymentName,
-				Kind:       "Deployment",
+				Kind:       controllers.DeploymentStr,
 				APIVersion: "v1",
 			}
 			vpa.Spec.ResourcePolicy = &vpav1.PodResourcePolicy{

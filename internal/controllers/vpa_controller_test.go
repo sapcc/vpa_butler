@@ -2,9 +2,12 @@ package controllers_test
 
 import (
 	"context"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/sapcc/vpa_butler/internal/common"
+	"github.com/sapcc/vpa_butler/internal/controllers"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -28,7 +31,7 @@ var _ = Describe("VpaController", func() {
 			vpa.Namespace = metav1.NamespaceDefault
 			vpa.Spec.TargetRef = &autoscalingv1.CrossVersionObjectReference{
 				Name:       deploymentName,
-				Kind:       "Deployment",
+				Kind:       controllers.DeploymentStr,
 				APIVersion: "v1",
 			}
 			Expect(k8sClient.Create(context.Background(), vpa)).To(Succeed())
@@ -56,14 +59,19 @@ var _ = Describe("VpaController", func() {
 	When("creating a deployment", func() {
 
 		var deployment *appsv1.Deployment
+		var defaultUpdateMode vpav1.UpdateMode
 
 		BeforeEach(func() {
+			defaultUpdateMode = common.VpaUpdateMode
 			deployment = makeDeployment()
 			Expect(k8sClient.Create(context.Background(), deployment)).To(Succeed())
 		})
 
 		AfterEach(func() {
+			// failsafe: there is a deletion in the tests, so we drop the error here
+			_ = k8sClient.Delete(context.Background(), deployment)
 			deleteVpa("test-deployment-deployment")
+			common.VpaUpdateMode = defaultUpdateMode
 		})
 
 		It("deletes Vpas with an orphaned target on reconciliation", func() {
@@ -88,6 +96,32 @@ var _ = Describe("VpaController", func() {
 				err := k8sClient.Get(context.Background(), name, &vpa)
 				return errors.IsNotFound(err)
 			}).Should(BeTrue())
+		})
+
+		It("patches the served vpa", func() {
+			// need to sleep here to ensure the a vpa is created before the update
+			// to this global variable
+			time.Sleep(100 * time.Millisecond)
+			common.VpaUpdateMode = vpav1.UpdateModeAuto
+			var unmodified vpav1.VerticalPodAutoscaler
+			Expect(k8sClient.Get(context.Background(), types.NamespacedName{
+				Namespace: metav1.NamespaceDefault,
+				Name:      "test-deployment-deployment",
+			}, &unmodified)).To(Succeed())
+			changed := unmodified.DeepCopy()
+			changed.Labels = map[string]string{"changed": "true"}
+			Expect(k8sClient.Patch(context.Background(), changed, client.MergeFrom(&unmodified))).To(Succeed())
+			Eventually(func() vpav1.UpdateMode {
+				var vpa vpav1.VerticalPodAutoscaler
+				err := k8sClient.Get(context.Background(), types.NamespacedName{
+					Name:      "test-deployment-deployment",
+					Namespace: metav1.NamespaceDefault,
+				}, &vpa)
+				if err != nil {
+					return vpav1.UpdateMode("")
+				}
+				return *vpa.Spec.UpdatePolicy.UpdateMode
+			}).Should(Equal(common.VpaUpdateMode))
 		})
 
 	})

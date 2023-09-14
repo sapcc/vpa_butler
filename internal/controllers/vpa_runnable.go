@@ -67,6 +67,7 @@ func (v *VpaRunnable) reconcile(ctx context.Context) {
 			v.Log.Error(err, "failed to determine valid nodes", "namespace", target.Vpa.Namespace, "name", target.Vpa.Name)
 		}
 		if len(viable) == 0 {
+			v.Log.Error(err, "no valid nodes found", "namespace", target.Vpa.Namespace, "name", target.Vpa.Name)
 			return
 		}
 		largest := maxByMemory(viable)
@@ -93,7 +94,7 @@ func (v *VpaRunnable) extractTarget(ctx context.Context, vpa *vpav1.VerticalPodA
 	}
 	ref := *vpa.Spec.TargetRef
 	switch ref.Kind {
-	case "Deployment":
+	case DeploymentStr:
 		var deployment appsv1.Deployment
 		err := v.Client.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: vpa.Namespace}, &deployment)
 		if err != nil {
@@ -105,7 +106,7 @@ func (v *VpaRunnable) extractTarget(ctx context.Context, vpa *vpav1.VerticalPodA
 			PodSpec:  deployment.Spec.Template.Spec,
 			Selector: *deployment.Spec.Selector,
 		}, nil
-	case "StatefulSet":
+	case StatefulSetStr:
 		var sts appsv1.StatefulSet
 		err := v.Client.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: vpa.Namespace}, &sts)
 		if err != nil {
@@ -117,7 +118,7 @@ func (v *VpaRunnable) extractTarget(ctx context.Context, vpa *vpav1.VerticalPodA
 			PodSpec:  sts.Spec.Template.Spec,
 			Selector: *sts.Spec.Selector,
 		}, nil
-	case "DaemonSet":
+	case DaemonSetStr:
 		var ds appsv1.DaemonSet
 		err := v.Client.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: vpa.Namespace}, &ds)
 		if err != nil {

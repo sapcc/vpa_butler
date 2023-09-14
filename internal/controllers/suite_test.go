@@ -59,17 +59,16 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&controllers.VpaController{
-		Client:  k8sManager.GetClient(),
-		Log:     GinkgoLogr.WithName("vpa-controller"),
-		Scheme:  k8sManager.GetScheme(),
-		Version: "test",
+		Client:           k8sManager.GetClient(),
+		Log:              GinkgoLogr.WithName("vpa-controller"),
+		Scheme:           k8sManager.GetScheme(),
+		Version:          "test",
+		MinAllowedCPU:    testMinAllowedCPU,
+		MinAllowedMemory: testMinAllowedMemory,
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	Expect(controllers.SetupForAppsV1(k8sManager, controllers.GenericControllerParams{
-		MinAllowedCPU:    testMinAllowedCPU,
-		MinAllowedMemory: testMinAllowedMemory,
-	})).To(Succeed())
+	Expect(controllers.SetupForAppsV1(k8sManager)).To(Succeed())
 
 	Expect(k8sManager.Add(&controllers.VpaRunnable{
 		Client:          k8sManager.GetClient(),

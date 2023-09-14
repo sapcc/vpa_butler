@@ -3,12 +3,11 @@ package controllers_test
 import (
 	"context"
 	"fmt"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/sapcc/vpa_butler/internal/common"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"github.com/sapcc/vpa_butler/internal/controllers"
 
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
@@ -56,6 +55,13 @@ func expectVpa(name string) {
 		}
 		if mangedBy != common.AnnotationVpaButler {
 			return fmt.Errorf("vpa has wrong managed-by annotation")
+		}
+		// the min resources stuff technically belongs to vpa_controller.go
+		if vpa.Spec.ResourcePolicy == nil {
+			return fmt.Errorf("vpa resource policy is nil")
+		}
+		if len(vpa.Spec.ResourcePolicy.ContainerPolicies) != 1 {
+			return fmt.Errorf("vpa has wrong amount of container policies")
 		}
 		minAllowed := vpa.Spec.ResourcePolicy.ContainerPolicies[0].MinAllowed
 		if !minAllowed.Cpu().Equal(testMinAllowedCPU) {
@@ -149,27 +155,6 @@ var _ = Describe("GenericController", func() {
 		It("should create a vpa", func() {
 			expectVpa("test-deployment-deployment")
 		})
-
-		It("patches the served vpa", func() {
-			// need to sleep here to ensure the a vpa is created before the update
-			// to this global variable
-			time.Sleep(100 * time.Millisecond)
-			common.VpaUpdateMode = vpav1.UpdateModeAuto
-			unmodified := deployment.DeepCopy()
-			deployment.Spec.Replicas = ptr.To[int32](2)
-			Expect(k8sClient.Patch(context.Background(), deployment, client.MergeFrom(unmodified))).To(Succeed())
-			Eventually(func() vpav1.UpdateMode {
-				var vpa vpav1.VerticalPodAutoscaler
-				err := k8sClient.Get(context.Background(), types.NamespacedName{
-					Name:      "test-deployment-deployment",
-					Namespace: metav1.NamespaceDefault,
-				}, &vpa)
-				if err != nil {
-					return vpav1.UpdateMode("")
-				}
-				return *vpa.Spec.UpdatePolicy.UpdateMode
-			}).Should(Equal(common.VpaUpdateMode))
-		})
 	})
 
 	Context("when creating a statefulset", func() {
@@ -218,7 +203,7 @@ var _ = Describe("GenericController", func() {
 			vpa.Namespace = metav1.NamespaceDefault
 			vpa.Spec.TargetRef = &autoscalingv1.CrossVersionObjectReference{
 				Name:       deploymentName,
-				Kind:       "Deployment",
+				Kind:       controllers.DeploymentStr,
 				APIVersion: "v1",
 			}
 			Expect(k8sClient.Create(context.Background(), vpa)).To(Succeed())

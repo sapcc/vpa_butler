@@ -82,13 +82,12 @@ func main() {
 	})
 
 	handleError(err, "unable to start manager")
-	handleError(controllers.SetupForAppsV1(mgr, controllers.GenericControllerParams{
+	handleError(controllers.SetupForAppsV1(mgr), "unable to setup apps/v1 controllers")
+	vpaController := controllers.VpaController{
+		Client:           mgr.GetClient(),
+		Version:          Version,
 		MinAllowedCPU:    minAllowedCPU,
 		MinAllowedMemory: minAllowedMemory,
-	}), "unable to setup apps/v1 controllers")
-	vpaController := controllers.VpaController{
-		Client:  mgr.GetClient(),
-		Version: Version,
 	}
 	handleError(vpaController.SetupWithManager(mgr), "unable to setup vpa controller")
 	vpaRunnable := controllers.VpaRunnable{
