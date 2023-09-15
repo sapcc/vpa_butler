@@ -14,7 +14,10 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"github.com/sapcc/vpa_butler/internal/common"
 )
@@ -73,12 +76,15 @@ func main() {
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 	setupLog.Info("starting")
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:             scheme,
-		MetricsBindAddress: ":8080",
-		Port:               webhookPort,
-		LeaderElection:     false,
-		Namespace:          "",
-		SyncPeriod:         &syncPeriod,
+		Scheme:         scheme,
+		LeaderElection: false,
+		WebhookServer:  webhook.NewServer(webhook.Options{Port: webhookPort}),
+		Metrics: server.Options{
+			BindAddress: ":8080",
+		},
+		Cache: cache.Options{
+			SyncPeriod: &syncPeriod,
+		},
 	})
 
 	handleError(err, "unable to start manager")
