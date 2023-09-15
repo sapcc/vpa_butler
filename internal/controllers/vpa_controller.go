@@ -266,8 +266,8 @@ func (v *VpaController) configureVpa(vpaOwner client.Object, vpa *vpav1.Vertical
 
 func isNewNamingSchema(name string) bool {
 	suffixes := []string{"-daemonset", "-statefulset", "-deployment"}
-	for _, prefix := range suffixes {
-		if strings.HasSuffix(name, prefix) {
+	for _, suffix := range suffixes {
+		if strings.HasSuffix(name, suffix) {
 			return true
 		}
 	}
