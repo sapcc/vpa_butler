@@ -61,7 +61,7 @@ var _ = Describe("VpaRunnable", func() {
 		node = &corev1.Node{}
 		node.Name = "the-node"
 		node.Status.Allocatable = corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse("1000"),
+			corev1.ResourceCPU:    resource.MustParse("1"),
 			corev1.ResourceMemory: resource.MustParse("2000"),
 		}
 		Expect(k8sClient.Create(context.Background(), node))
@@ -76,7 +76,7 @@ var _ = Describe("VpaRunnable", func() {
 		})
 
 		It("sets maximum allocatable resources", func() {
-			expectMaxResources(deploymentName+"-deployment", "900", "1800")
+			expectMaxResources(deploymentName+"-deployment", "900m", "1800")
 		})
 
 		AfterEach(func() {
@@ -95,7 +95,7 @@ var _ = Describe("VpaRunnable", func() {
 		})
 
 		It("sets the maximum allocatable resources", func() {
-			expectMaxResources(statefulSetName+"-statefulset", "900", "1800")
+			expectMaxResources(statefulSetName+"-statefulset", "900m", "1800")
 		})
 
 		AfterEach(func() {
@@ -113,7 +113,7 @@ var _ = Describe("VpaRunnable", func() {
 		})
 
 		It("sets the maximum allocatable resources", func() {
-			expectMaxResources(daemonSetName+"-daemonset", "900", "1800")
+			expectMaxResources(daemonSetName+"-daemonset", "900m", "1800")
 		})
 
 		AfterEach(func() {
@@ -183,7 +183,7 @@ var _ = Describe("VpaRunnable", func() {
 			secondNode = &corev1.Node{}
 			secondNode.Name = "second-node"
 			secondNode.Status.Allocatable = corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("4000"),
+				corev1.ResourceCPU:    resource.MustParse("4000m"),
 				corev1.ResourceMemory: resource.MustParse("500"),
 			}
 			Expect(k8sClient.Create(context.Background(), secondNode))
@@ -198,7 +198,7 @@ var _ = Describe("VpaRunnable", func() {
 		})
 
 		It("prefers the node with the most memory for setting the maximum allowed resources", func() {
-			expectMaxResources(deploymentName+"-deployment", "900", "1800")
+			expectMaxResources(deploymentName+"-deployment", "900m", "1800")
 		})
 	})
 
@@ -215,7 +215,7 @@ var _ = Describe("VpaRunnable", func() {
 		})
 
 		It("distributes maximum allocatable resources evenly", func() {
-			expectMaxResources(deploymentName+"-deployment", "450", "900")
+			expectMaxResources(deploymentName+"-deployment", "450m", "900")
 		})
 
 		AfterEach(func() {
