@@ -168,5 +168,5 @@ func maxByMemory(nodes []corev1.Node) corev1.Node {
 }
 
 func scaleQuantity(q *resource.Quantity, percent int64) *resource.Quantity {
-	return resource.NewQuantity(q.Value()*percent/scaleDivisor, q.Format)
+	return resource.NewMilliQuantity(q.MilliValue()*percent/scaleDivisor, q.Format)
 }
