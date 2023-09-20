@@ -63,7 +63,7 @@ jobs:
 
       - name: Install Ginkgo CLI
         run: |
-          go install github.com/onsi/ginkgo/v2/ginkgo@v2.11.0
+          go install github.com/onsi/ginkgo/v2/ginkgo@v2.12.0
           go install sigs.k8s.io/controller-runtime/tools/setup-envtest@v0.0.0-20230720032208-b1d6919d3e12
 
       - name: Run tests

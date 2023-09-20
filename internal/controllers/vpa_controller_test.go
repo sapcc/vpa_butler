@@ -2,7 +2,6 @@ package controllers_test
 
 import (
 	"context"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -99,15 +98,16 @@ var _ = Describe("VpaController", func() {
 		})
 
 		It("patches the served vpa", func() {
-			// need to sleep here to ensure the a vpa is created before the update
-			// to this global variable
-			time.Sleep(100 * time.Millisecond)
-			common.VpaUpdateMode = vpav1.UpdateModeAuto
 			var unmodified vpav1.VerticalPodAutoscaler
-			Expect(k8sClient.Get(context.Background(), types.NamespacedName{
-				Namespace: metav1.NamespaceDefault,
-				Name:      "test-deployment-deployment",
-			}, &unmodified)).To(Succeed())
+			Eventually(func() error {
+				return k8sClient.Get(context.Background(), types.NamespacedName{
+					Namespace: metav1.NamespaceDefault,
+					Name:      "test-deployment-deployment",
+				}, &unmodified)
+			}).Should(Succeed())
+			// need to ensure that a vpa is created before the update
+			// to this global variable
+			common.VpaUpdateMode = vpav1.UpdateModeAuto
 			changed := unmodified.DeepCopy()
 			changed.Labels = map[string]string{"changed": "true"}
 			Expect(k8sClient.Patch(context.Background(), changed, client.MergeFrom(&unmodified))).To(Succeed())
