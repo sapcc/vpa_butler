@@ -65,10 +65,11 @@ func (v *VpaRunnable) reconcile(ctx context.Context) {
 		viable, err := filter.Evaluate(target, schedulable)
 		if err != nil {
 			v.Log.Error(err, "failed to determine valid nodes", "namespace", target.Vpa.Namespace, "name", target.Vpa.Name)
+			continue
 		}
 		if len(viable) == 0 {
-			v.Log.Error(err, "no valid nodes found", "namespace", target.Vpa.Namespace, "name", target.Vpa.Name)
-			return
+			v.Log.Error(err, "no valid nodes for vpa target found", "namespace", target.Vpa.Namespace, "name", target.Vpa.Name)
+			continue
 		}
 		largest := maxByMemory(viable)
 		containers := int64(len(target.PodSpec.Containers))
