@@ -89,7 +89,9 @@ var _ = Describe("VpaController", func() {
 			Expect(k8sClient.Get(context.Background(), name, &vpa)).To(Succeed())
 			unmodified := vpa.DeepCopy()
 			vpa.Labels = map[string]string{"cloud.sap/reconcile": "please"}
-			Expect(k8sClient.Patch(context.Background(), &vpa, client.MergeFrom(unmodified))).To(Succeed())
+			Expect(k8sClient.Patch(context.Background(), &vpa, client.MergeFrom(unmodified))).To(
+				Satisfy(func(err error) bool { return err == nil || errors.IsNotFound(err) }),
+			)
 
 			Eventually(func(g Gomega) bool {
 				err := k8sClient.Get(context.Background(), name, &vpa)
