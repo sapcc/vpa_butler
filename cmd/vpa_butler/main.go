@@ -41,7 +41,6 @@ var (
 	defaultVpaSupportedValues string
 	defaultMinAllowedMemory   string
 	defaultMinAllowedCPU      string
-	supportedUpdatedModes     = []string{"Off", "Initial", "Recreate"}
 	supportedValues           = []string{"RequestsOnly", "RequestsAndLimits"}
 	capacityPercent           int64
 )
@@ -52,7 +51,7 @@ func init() {
 
 	flag.StringVar(&defaultVpaUpdateMode, "default-vpa-update-mode", "Off",
 		fmt.Sprintf("The default update mode for the vpa instances. Must be one of: %s",
-			strings.Join(supportedUpdatedModes, ",")))
+			strings.Join(common.SupportedUpdatedModes, ",")))
 
 	flag.StringVar(&defaultVpaSupportedValues, "default-vpa-supported-values", "RequestsOnly",
 		fmt.Sprintf("Controls which resource value should be autoscaled. Must be one of: %s",
@@ -121,7 +120,7 @@ func setGlobals() {
 	default:
 		fmt.Printf("unsupported update mode %s. Must be one of: %s",
 			defaultVpaUpdateMode,
-			strings.Join(supportedUpdatedModes, ","))
+			strings.Join(common.SupportedUpdatedModes, ","))
 		os.Exit(1)
 	}
 

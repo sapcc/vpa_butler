@@ -17,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	vpav1 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1"
+	"k8s.io/utils/strings/slices"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -239,7 +240,14 @@ func (v *VpaController) reconcileVpa(ctx context.Context, vpaOwner client.Object
 }
 
 func (v *VpaController) configureVpa(vpaOwner client.Object, vpa *vpav1.VerticalPodAutoscaler) error {
-	common.ConfigureVpaBaseline(vpa, vpaOwner, common.VpaUpdateMode)
+	annotations := vpaOwner.GetAnnotations()
+	updateMode := common.VpaUpdateMode
+	if updateModeStr, ok := annotations[UpdateModeAnnotationKey]; ok {
+		if slices.Contains(common.SupportedUpdatedModes, updateModeStr) {
+			updateMode = vpav1.UpdateMode(updateModeStr)
+		}
+	}
+	common.ConfigureVpaBaseline(vpa, vpaOwner, updateMode)
 
 	resourceList := []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory}
 	if vpa.Spec.ResourcePolicy == nil || len(vpa.Spec.ResourcePolicy.ContainerPolicies) == 0 {

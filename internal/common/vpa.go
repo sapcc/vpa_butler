@@ -12,8 +12,9 @@ const (
 )
 
 var (
-	VpaUpdateMode       = vpav1.UpdateModeOff
-	VpaControlledValues = vpav1.ContainerControlledValuesRequestsOnly
+	VpaUpdateMode         = vpav1.UpdateModeOff
+	VpaControlledValues   = vpav1.ContainerControlledValuesRequestsOnly
+	SupportedUpdatedModes = []string{"Off", "Initial", "Recreate"}
 )
 
 func ManagedByButler(vpa *vpav1.VerticalPodAutoscaler) bool {

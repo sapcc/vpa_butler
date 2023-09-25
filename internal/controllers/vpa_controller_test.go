@@ -126,5 +126,22 @@ var _ = Describe("VpaController", func() {
 			}).Should(Equal(common.VpaUpdateMode))
 		})
 
+		It("updates the update mode based on the annotation", func() {
+			unmodified := deployment.DeepCopy()
+			deployment.Annotations = map[string]string{controllers.UpdateModeAnnotationKey: string(vpav1.UpdateModeRecreate)}
+			Expect(k8sClient.Patch(context.Background(), deployment, client.MergeFrom(unmodified))).To(Succeed())
+			Eventually(func() vpav1.UpdateMode {
+				var vpa vpav1.VerticalPodAutoscaler
+				err := k8sClient.Get(context.Background(), types.NamespacedName{
+					Name:      "test-deployment-deployment",
+					Namespace: metav1.NamespaceDefault,
+				}, &vpa)
+				if err != nil {
+					return vpav1.UpdateMode("")
+				}
+				return *vpa.Spec.UpdatePolicy.UpdateMode
+			}).Should(Equal(vpav1.UpdateModeRecreate))
+		})
+
 	})
 })

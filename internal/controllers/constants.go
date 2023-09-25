@@ -6,4 +6,5 @@ const (
 	DeploymentStr  string = "Deployment"
 
 	MainContainerAnnotationKey = "vpa-butler.cloud.sap/main-container"
+	UpdateModeAnnotationKey    = "vpa-butler.cloud.sap/update-mode"
 )

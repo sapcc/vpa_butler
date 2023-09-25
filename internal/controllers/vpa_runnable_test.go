@@ -231,6 +231,9 @@ var _ = Describe("VpaRunnable", func() {
 			var policies []vpav1.ContainerResourcePolicy
 			Eventually(func(g Gomega) []vpav1.ContainerResourcePolicy {
 				g.Expect(k8sClient.Get(context.Background(), vpaRef, &vpa)).To(Succeed())
+				if vpa.Spec.ResourcePolicy == nil {
+					return nil
+				}
 				policies = vpa.Spec.ResourcePolicy.ContainerPolicies
 				return policies
 			}).Should(HaveLen(2))
