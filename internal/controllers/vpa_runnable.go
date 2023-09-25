@@ -62,30 +62,7 @@ func (v *VpaRunnable) reconcile(ctx context.Context) {
 	}
 	schedulable := filter.Schedulable(nodes.Items)
 	for _, target := range targetedVpas {
-		viable, err := filter.Evaluate(target, schedulable)
-		if err != nil {
-			v.Log.Error(err, "failed to determine valid nodes", "namespace", target.Vpa.Namespace, "name", target.Vpa.Name)
-			continue
-		}
-		if len(viable) == 0 {
-			v.Log.Error(err, "no valid nodes for vpa target found", "namespace", target.Vpa.Namespace, "name", target.Vpa.Name)
-			continue
-		}
-		largest := maxByMemory(viable)
-		containers := int64(len(target.PodSpec.Containers))
-		// distribute a fraction of maximum capacity evenly across containers
-		cpuScaled := scaleQuantityMilli(largest.Status.Allocatable.Cpu(), v.CapacityPercent/containers)
-		memScaled := scaleQuantity(largest.Status.Allocatable.Memory(), v.CapacityPercent/containers)
-		err = v.patchMaxRessources(ctx, patchParams{
-			vpa:    target.Vpa,
-			cpu:    *cpuScaled,
-			memory: *memScaled,
-		})
-		if err != nil {
-			v.Log.Error(err, "failed to set maximum allowed resources for vpa",
-				"name", target.Vpa.Name, "namespace", target.Vpa.Namespace)
-			continue
-		}
+		v.reconcileMaxResource(ctx, target, schedulable)
 	}
 }
 
@@ -103,9 +80,10 @@ func (v *VpaRunnable) extractTarget(ctx context.Context, vpa *vpav1.VerticalPodA
 				vpa.Namespace, ref.Name, ref.Kind)
 		}
 		return filter.TargetedVpa{
-			Vpa:      vpa,
-			PodSpec:  deployment.Spec.Template.Spec,
-			Selector: *deployment.Spec.Selector,
+			Vpa:        vpa,
+			PodSpec:    deployment.Spec.Template.Spec,
+			Selector:   *deployment.Spec.Selector,
+			ObjectMeta: deployment.ObjectMeta,
 		}, nil
 	case StatefulSetStr:
 		var sts appsv1.StatefulSet
@@ -115,9 +93,10 @@ func (v *VpaRunnable) extractTarget(ctx context.Context, vpa *vpav1.VerticalPodA
 				vpa.Namespace, ref.Name, ref.Kind)
 		}
 		return filter.TargetedVpa{
-			Vpa:      vpa,
-			PodSpec:  sts.Spec.Template.Spec,
-			Selector: *sts.Spec.Selector,
+			Vpa:        vpa,
+			PodSpec:    sts.Spec.Template.Spec,
+			Selector:   *sts.Spec.Selector,
+			ObjectMeta: sts.ObjectMeta,
 		}, nil
 	case DaemonSetStr:
 		var ds appsv1.DaemonSet
@@ -127,34 +106,75 @@ func (v *VpaRunnable) extractTarget(ctx context.Context, vpa *vpav1.VerticalPodA
 				vpa.Namespace, ref.Name, ref.Kind)
 		}
 		return filter.TargetedVpa{
-			Vpa:      vpa,
-			PodSpec:  ds.Spec.Template.Spec,
-			Selector: *ds.Spec.Selector,
+			Vpa:        vpa,
+			PodSpec:    ds.Spec.Template.Spec,
+			Selector:   *ds.Spec.Selector,
+			ObjectMeta: ds.ObjectMeta,
 		}, nil
 	}
 	return filter.TargetedVpa{}, fmt.Errorf("unknown target kind %s for vpa %s/%s encountered",
 		ref.Kind, vpa.Namespace, vpa.Name)
 }
 
+func (v *VpaRunnable) reconcileMaxResource(ctx context.Context, target filter.TargetedVpa, schedulable []corev1.Node) {
+	viable, err := filter.Evaluate(target, schedulable)
+	if err != nil {
+		v.Log.Error(err, "failed to determine valid nodes", "namespace", target.Vpa.Namespace, "name", target.Vpa.Name)
+		return
+	}
+	if len(viable) == 0 {
+		v.Log.Error(err, "no valid nodes for vpa target found", "namespace", target.Vpa.Namespace, "name", target.Vpa.Name)
+		return
+	}
+	distributionFunc := uniformDistribution
+	if target.ObjectMeta.Annotations != nil && len(target.PodSpec.Containers) > 1 {
+		if mainContainer, ok := target.ObjectMeta.Annotations[MainContainerAnnotationKey]; ok {
+			distributionFunc = asymmetricDistribution(mainContainer)
+		}
+	}
+	largest := maxByMemory(viable)
+	err = v.patchMaxRessources(ctx, patchParams{
+		vpa: target.Vpa,
+		namedResources: distributionFunc(resourceDistributionParams{
+			target:          target,
+			largest:         &largest,
+			capacityPercent: v.CapacityPercent,
+		}),
+	})
+	if err != nil {
+		v.Log.Error(err, "failed to set maximum allowed resources for vpa",
+			"name", target.Vpa.Name, "namespace", target.Vpa.Namespace)
+		return
+	}
+}
+
 type patchParams struct {
-	vpa    *vpav1.VerticalPodAutoscaler
-	cpu    resource.Quantity
-	memory resource.Quantity
+	vpa            *vpav1.VerticalPodAutoscaler
+	namedResources []namedResourceList
 }
 
 func (v *VpaRunnable) patchMaxRessources(ctx context.Context, params patchParams) error {
 	vpa := params.vpa
-	if vpa.Spec.ResourcePolicy == nil {
+	if vpa.Spec.ResourcePolicy == nil || len(vpa.Spec.ResourcePolicy.ContainerPolicies) == 0 {
 		return fmt.Errorf("resource policy of vpa %s/%s is empty", vpa.Namespace, vpa.Name)
 	}
-	if len(vpa.Spec.ResourcePolicy.ContainerPolicies) != 1 {
-		return fmt.Errorf("vpa %s/%s does not have a sole container policy", vpa.Namespace, vpa.Name)
-	}
 	unmodified := vpa.DeepCopy()
-	vpa.Spec.ResourcePolicy.ContainerPolicies[0].MaxAllowed = corev1.ResourceList{
-		corev1.ResourceCPU:    params.cpu,
-		corev1.ResourceMemory: params.memory,
+	controlledResources := vpa.Spec.ResourcePolicy.ContainerPolicies[0].ControlledResources
+	controlledValues := vpa.Spec.ResourcePolicy.ContainerPolicies[0].ControlledValues
+	minAllowed := vpa.Spec.ResourcePolicy.ContainerPolicies[0].MinAllowed
+	mode := vpa.Spec.ResourcePolicy.ContainerPolicies[0].Mode
+	policies := make([]vpav1.ContainerResourcePolicy, len(params.namedResources))
+	for i, namedResources := range params.namedResources {
+		policies[i] = vpav1.ContainerResourcePolicy{
+			ContainerName:       namedResources.containerName,
+			Mode:                mode,
+			MinAllowed:          minAllowed,
+			MaxAllowed:          namedResources.resources,
+			ControlledResources: controlledResources,
+			ControlledValues:    controlledValues,
+		}
 	}
+	vpa.Spec.ResourcePolicy.ContainerPolicies = policies
 	return v.Client.Patch(ctx, vpa, client.MergeFrom(unmodified))
 }
 
@@ -174,4 +194,62 @@ func scaleQuantityMilli(q *resource.Quantity, percent int64) *resource.Quantity 
 
 func scaleQuantity(q *resource.Quantity, percent int64) *resource.Quantity {
 	return resource.NewQuantity(q.Value()*percent/scaleDivisor, q.Format)
+}
+
+type resourceDistributionParams struct {
+	target          filter.TargetedVpa
+	largest         *corev1.Node
+	capacityPercent int64
+}
+
+type namedResourceList struct {
+	containerName string
+	resources     corev1.ResourceList
+}
+
+type maxResourceDistributionFunc func(params resourceDistributionParams) []namedResourceList
+
+func uniformDistribution(params resourceDistributionParams) []namedResourceList {
+	containers := int64(len(params.target.PodSpec.Containers))
+	// distribute a fraction of maximum capacity evenly across containers
+	cpuScaled := scaleQuantityMilli(params.largest.Status.Allocatable.Cpu(), params.capacityPercent/containers)
+	memScaled := scaleQuantity(params.largest.Status.Allocatable.Memory(), params.capacityPercent/containers)
+	return []namedResourceList{
+		{
+			containerName: "*",
+			resources: corev1.ResourceList{
+				corev1.ResourceCPU:    *cpuScaled,
+				corev1.ResourceMemory: *memScaled,
+			},
+		},
+	}
+}
+
+func asymmetricDistribution(mainContainer string) maxResourceDistributionFunc {
+	return func(params resourceDistributionParams) []namedResourceList {
+		totalFraction, mainFraction := 4, 3
+		containers := params.target.PodSpec.Containers
+		totalWeight := int64(totalFraction * (len(containers) - 1))
+		mainWeight := int64(mainFraction * (len(containers) - 1))
+		cpuMain := scaleQuantityMilli(params.largest.Status.Allocatable.Cpu(), params.capacityPercent*mainWeight/totalWeight)
+		memMain := scaleQuantity(params.largest.Status.Allocatable.Memory(), params.capacityPercent*mainWeight/totalWeight)
+		cpuOther := scaleQuantityMilli(params.largest.Status.Allocatable.Cpu(), params.capacityPercent/totalWeight)
+		memOther := scaleQuantity(params.largest.Status.Allocatable.Memory(), params.capacityPercent/totalWeight)
+		return []namedResourceList{
+			{
+				containerName: mainContainer,
+				resources: corev1.ResourceList{
+					corev1.ResourceCPU:    *cpuMain,
+					corev1.ResourceMemory: *memMain,
+				},
+			},
+			{
+				containerName: "*",
+				resources: corev1.ResourceList{
+					corev1.ResourceCPU:    *cpuOther,
+					corev1.ResourceMemory: *memOther,
+				},
+			},
+		}
+	}
 }

@@ -19,9 +19,10 @@ func Schedulable(nodes []corev1.Node) []corev1.Node {
 }
 
 type TargetedVpa struct {
-	Vpa      *vpav1.VerticalPodAutoscaler
-	PodSpec  corev1.PodSpec
-	Selector metav1.LabelSelector
+	Vpa        *vpav1.VerticalPodAutoscaler
+	PodSpec    corev1.PodSpec
+	Selector   metav1.LabelSelector
+	ObjectMeta metav1.ObjectMeta
 }
 
 type NodeFilter func(target TargetedVpa, nodes []corev1.Node) ([]corev1.Node, error)

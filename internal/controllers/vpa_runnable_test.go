@@ -8,6 +8,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/sapcc/vpa_butler/internal/common"
 	"github.com/sapcc/vpa_butler/internal/controllers"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
@@ -216,6 +217,29 @@ var _ = Describe("VpaRunnable", func() {
 
 		It("distributes maximum allocatable resources evenly", func() {
 			expectMaxResources(deploymentName+"-deployment", "450m", "900")
+		})
+
+		It("distributes resources asymmetrical if a main container is annotated", func() {
+			unmodified := deployment.DeepCopy()
+			deployment.Annotations = map[string]string{controllers.MainContainerAnnotationKey: "next"}
+			Expect(k8sClient.Patch(context.Background(), deployment, client.MergeFrom(unmodified))).To(Succeed())
+			var vpaRef types.NamespacedName
+			vpaRef.Name = deploymentName + "-deployment"
+			vpaRef.Namespace = metav1.NamespaceDefault
+
+			var vpa vpav1.VerticalPodAutoscaler
+			var policies []vpav1.ContainerResourcePolicy
+			Eventually(func(g Gomega) []vpav1.ContainerResourcePolicy {
+				g.Expect(k8sClient.Get(context.Background(), vpaRef, &vpa)).To(Succeed())
+				policies = vpa.Spec.ResourcePolicy.ContainerPolicies
+				return policies
+			}).Should(HaveLen(2))
+			Expect(policies[0].ContainerName).To(Equal("next"))
+			Expect(policies[0].MaxAllowed.Cpu().MilliValue()).To(BeEquivalentTo(670))
+			Expect(policies[0].MaxAllowed.Memory().Value()).To(BeEquivalentTo(1340))
+			Expect(policies[1].ContainerName).To(Equal("*"))
+			Expect(policies[1].MaxAllowed.Cpu().MilliValue()).To(BeEquivalentTo(220))
+			Expect(policies[1].MaxAllowed.Memory().Value()).To(BeEquivalentTo(440))
 		})
 
 		AfterEach(func() {

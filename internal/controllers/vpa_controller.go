@@ -242,22 +242,29 @@ func (v *VpaController) configureVpa(vpaOwner client.Object, vpa *vpav1.Vertical
 	common.ConfigureVpaBaseline(vpa, vpaOwner, common.VpaUpdateMode)
 
 	resourceList := []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory}
-	containerResourcePolicy := vpav1.ContainerResourcePolicy{
-		ContainerName:       "*",
-		ControlledResources: &resourceList,
-		ControlledValues:    &common.VpaControlledValues,
-		MinAllowed: corev1.ResourceList{
-			corev1.ResourceCPU:    v.MinAllowedCPU,
-			corev1.ResourceMemory: v.MinAllowedMemory,
-		},
-	}
-	if vpa.Spec.ResourcePolicy != nil && len(vpa.Spec.ResourcePolicy.ContainerPolicies) > 0 {
-		oldPolicy := vpa.Spec.ResourcePolicy.ContainerPolicies[0]
-		containerResourcePolicy.MaxAllowed = oldPolicy.MaxAllowed.DeepCopy()
-	}
-
-	vpa.Spec.ResourcePolicy = &vpav1.PodResourcePolicy{
-		ContainerPolicies: []vpav1.ContainerResourcePolicy{containerResourcePolicy},
+	if vpa.Spec.ResourcePolicy == nil || len(vpa.Spec.ResourcePolicy.ContainerPolicies) == 0 {
+		containerResourcePolicy := vpav1.ContainerResourcePolicy{
+			ContainerName:       "*",
+			ControlledResources: &resourceList,
+			ControlledValues:    &common.VpaControlledValues,
+			MinAllowed: corev1.ResourceList{
+				corev1.ResourceCPU:    v.MinAllowedCPU,
+				corev1.ResourceMemory: v.MinAllowedMemory,
+			},
+		}
+		vpa.Spec.ResourcePolicy = &vpav1.PodResourcePolicy{
+			ContainerPolicies: []vpav1.ContainerResourcePolicy{containerResourcePolicy},
+		}
+	} else {
+		for i := range vpa.Spec.ResourcePolicy.ContainerPolicies {
+			current := &vpa.Spec.ResourcePolicy.ContainerPolicies[i]
+			current.ControlledResources = &resourceList
+			current.ControlledValues = &common.VpaControlledValues
+			current.MinAllowed = corev1.ResourceList{
+				corev1.ResourceCPU:    v.MinAllowedCPU,
+				corev1.ResourceMemory: v.MinAllowedMemory,
+			}
+		}
 	}
 	vpa.Annotations[annotationVpaButlerVersion] = v.Version
 
