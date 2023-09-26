@@ -75,16 +75,14 @@ func expectVpa(name string) {
 }
 
 func deleteVpa(name string) {
-	var vpaRef types.NamespacedName
-	vpaRef.Name = name
-	vpaRef.Namespace = metav1.NamespaceDefault
 	var vpa vpav1.VerticalPodAutoscaler
-	err := k8sClient.Get(context.Background(), vpaRef, &vpa)
+	vpa.Name = name
+	vpa.Namespace = metav1.NamespaceDefault
+	err := k8sClient.Delete(context.Background(), &vpa)
 	if errors.IsNotFound(err) {
 		return
 	}
 	Expect(err).To(Succeed())
-	Expect(k8sClient.Delete(context.Background(), &vpa)).To(Succeed())
 }
 
 func makeDeployment() *appsv1.Deployment {
