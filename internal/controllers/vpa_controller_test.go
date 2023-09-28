@@ -9,7 +9,9 @@ import (
 	"github.com/sapcc/vpa_butler/internal/controllers"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	vpav1 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1"
@@ -18,6 +20,22 @@ import (
 
 var _ = Describe("VpaController", func() {
 
+	var node *corev1.Node
+
+	BeforeEach(func() {
+		node = &corev1.Node{}
+		node.Name = "the-node"
+		node.Status.Capacity = corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("10"),
+			corev1.ResourceMemory: resource.MustParse("2048"),
+		}
+		Expect(k8sClient.Create(context.Background(), node)).To(Succeed())
+	})
+
+	AfterEach(func() {
+		Expect(k8sClient.Delete(context.Background(), node)).To(Succeed())
+	})
+
 	Context("when creating a deployment and a hand-crafted vpa afterwards", func() {
 		var deployment *appsv1.Deployment
 		var vpa *vpav1.VerticalPodAutoscaler
@@ -25,6 +43,35 @@ var _ = Describe("VpaController", func() {
 		BeforeEach(func() {
 			deployment = makeDeployment()
 			Expect(k8sClient.Create(context.Background(), deployment)).To(Succeed())
+		})
+
+		AfterEach(func() {
+			deleteVpa("test-deployment-custom-vpa")
+			deleteVpa("test-deployment-deployment")
+			Expect(k8sClient.Delete(context.Background(), deployment)).To(Succeed())
+		})
+
+		It("should delete the served vpa for apps/v1", func() {
+			vpa = &vpav1.VerticalPodAutoscaler{}
+			vpa.Name = "test-deployment-custom-vpa"
+			vpa.Namespace = metav1.NamespaceDefault
+			vpa.Spec.TargetRef = &autoscalingv1.CrossVersionObjectReference{
+				Name:       deploymentName,
+				Kind:       controllers.DeploymentStr,
+				APIVersion: "apps/v1",
+			}
+			Expect(k8sClient.Create(context.Background(), vpa)).To(Succeed())
+			Eventually(func() error {
+				var vpa vpav1.VerticalPodAutoscaler
+				err := k8sClient.Get(context.Background(), types.NamespacedName{
+					Name:      "test-deployment-deployment",
+					Namespace: metav1.NamespaceDefault,
+				}, &vpa)
+				return err
+			}).ShouldNot(Succeed())
+		})
+
+		It("should delete the served vpa for v1", func() {
 			vpa = &vpav1.VerticalPodAutoscaler{}
 			vpa.Name = "test-deployment-custom-vpa"
 			vpa.Namespace = metav1.NamespaceDefault
@@ -34,15 +81,6 @@ var _ = Describe("VpaController", func() {
 				APIVersion: "v1",
 			}
 			Expect(k8sClient.Create(context.Background(), vpa)).To(Succeed())
-		})
-
-		AfterEach(func() {
-			deleteVpa("test-deployment-custom-vpa")
-			deleteVpa("test-deployment-deployment")
-			Expect(k8sClient.Delete(context.Background(), deployment)).To(Succeed())
-		})
-
-		It("should delete the served vpa", func() {
 			Eventually(func() error {
 				var vpa vpav1.VerticalPodAutoscaler
 				err := k8sClient.Get(context.Background(), types.NamespacedName{

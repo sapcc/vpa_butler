@@ -75,7 +75,7 @@ func NodeAffinity(target TargetedVpa, nodes []corev1.Node) ([]corev1.Node, error
 }
 
 func Evaluate(target TargetedVpa, nodes []corev1.Node) ([]corev1.Node, error) {
-	filters := []NodeFilter{NodeName, TaintToleration}
+	filters := []NodeFilter{NodeName, TaintToleration, NodeAffinity}
 	next := nodes
 	for _, filter := range filters {
 		var err error

@@ -29,7 +29,7 @@ func ConfigureVpaBaseline(vpa *vpav1.VerticalPodAutoscaler, owner client.Object,
 	vpa.Spec.TargetRef = &autoscaling.CrossVersionObjectReference{
 		Kind:       owner.GetObjectKind().GroupVersionKind().Kind,
 		Name:       owner.GetName(),
-		APIVersion: owner.GetObjectKind().GroupVersionKind().Version,
+		APIVersion: owner.GetObjectKind().GroupVersionKind().GroupVersion().String(),
 	}
 	vpa.Spec.UpdatePolicy = &vpav1.PodUpdatePolicy{
 		UpdateMode: &updateMode,

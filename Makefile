@@ -1,6 +1,6 @@
 DATE    = $(shell date +%Y%m%d%H%M)
 IMAGE   ?= keppel.eu-de-1.cloud.sap/ccloud/vpa_butler
-VERSION ?= v0.1.2
+VERSION ?= $(shell git describe --tags --always --dirty)
 GOOS    ?= $(shell go env | grep GOOS | cut -d"'" -f2)
 BINARY  := vpa_butler
 OPTS    ?=

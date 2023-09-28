@@ -294,7 +294,19 @@ func equalTarget(a, b *vpav1.VerticalPodAutoscaler) bool {
 	if a.Spec.TargetRef == nil || b.Spec.TargetRef == nil {
 		return false
 	}
+	// apparently the apiVersion is currently not considered by the
+	// vpa so v1 and apps/v1 work for deployments etc., so ignore
+	// the prefix if only one apiVersion has a prefix
+	apiEqual := false
+	aSplitted := strings.Split(a.Spec.TargetRef.APIVersion, "/")
+	bSplitted := strings.Split(b.Spec.TargetRef.APIVersion, "/")
+	if len(aSplitted) == len(bSplitted) {
+		apiEqual = a.Spec.TargetRef.APIVersion == b.Spec.TargetRef.APIVersion
+	} else {
+		apiEqual = aSplitted[len(aSplitted)-1] == bSplitted[len(bSplitted)-1]
+	}
+
 	return a.Spec.TargetRef.Name == b.Spec.TargetRef.Name &&
 		a.Spec.TargetRef.Kind == b.Spec.TargetRef.Kind &&
-		a.Spec.TargetRef.APIVersion == b.Spec.TargetRef.APIVersion
+		apiEqual
 }
