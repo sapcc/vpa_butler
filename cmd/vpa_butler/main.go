@@ -41,7 +41,6 @@ var (
 	defaultVpaSupportedValues string
 	defaultMinAllowedMemory   string
 	defaultMinAllowedCPU      string
-	supportedValues           = []string{"RequestsOnly", "RequestsAndLimits"}
 	capacityPercent           int64
 )
 
@@ -55,7 +54,7 @@ func init() {
 
 	flag.StringVar(&defaultVpaSupportedValues, "default-vpa-supported-values", "RequestsOnly",
 		fmt.Sprintf("Controls which resource value should be autoscaled. Must be one of: %s",
-			strings.Join(supportedValues, ",")))
+			strings.Join(common.SupportedControlledValues, ",")))
 
 	flag.StringVar(&defaultMinAllowedMemory, "default-min-allowed-memory", "48Mi",
 		"The default min allowed memory per container that the vpa can set")
@@ -130,7 +129,7 @@ func setGlobals() {
 	case "RequestsOnly":
 		common.VpaControlledValues = autoscaling.ContainerControlledValuesRequestsOnly
 	default:
-		fmt.Printf("supported values must be one of: %s", strings.Join(supportedValues, ","))
+		fmt.Printf("supported values must be one of: %s", strings.Join(common.SupportedControlledValues, ","))
 		os.Exit(1)
 	}
 }

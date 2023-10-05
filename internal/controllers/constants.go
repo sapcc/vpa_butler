@@ -5,6 +5,7 @@ const (
 	StatefulSetStr string = "StatefulSet"
 	DeploymentStr  string = "Deployment"
 
-	MainContainerAnnotationKey = "vpa-butler.cloud.sap/main-container"
-	UpdateModeAnnotationKey    = "vpa-butler.cloud.sap/update-mode"
+	MainContainerAnnotationKey    string = "vpa-butler.cloud.sap/main-container"
+	UpdateModeAnnotationKey       string = "vpa-butler.cloud.sap/update-mode"
+	ControlledValuesAnnotationKey string = "vpa-butler.cloud.sap/controlled-values"
 )

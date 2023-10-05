@@ -240,21 +240,29 @@ func (v *VpaController) reconcileVpa(ctx context.Context, vpaOwner client.Object
 }
 
 func (v *VpaController) configureVpa(vpaOwner client.Object, vpa *vpav1.VerticalPodAutoscaler) error {
+	common.ConfigureVpaBaseline(vpa, vpaOwner, common.VpaUpdateMode)
 	annotations := vpaOwner.GetAnnotations()
-	updateMode := common.VpaUpdateMode
+
 	if updateModeStr, ok := annotations[UpdateModeAnnotationKey]; ok {
 		if slices.Contains(common.SupportedUpdatedModes, updateModeStr) {
-			updateMode = vpav1.UpdateMode(updateModeStr)
+			updateMode := vpav1.UpdateMode(updateModeStr)
+			vpa.Spec.UpdatePolicy.UpdateMode = &updateMode
 		}
 	}
-	common.ConfigureVpaBaseline(vpa, vpaOwner, updateMode)
+
+	ctrlValues := common.VpaControlledValues
+	if ctrlValuesStr, ok := annotations[ControlledValuesAnnotationKey]; ok {
+		if slices.Contains(common.SupportedControlledValues, ctrlValuesStr) {
+			ctrlValues = vpav1.ContainerControlledValues(ctrlValuesStr)
+		}
+	}
 
 	resourceList := []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory}
 	if vpa.Spec.ResourcePolicy == nil || len(vpa.Spec.ResourcePolicy.ContainerPolicies) == 0 {
 		containerResourcePolicy := vpav1.ContainerResourcePolicy{
 			ContainerName:       "*",
 			ControlledResources: &resourceList,
-			ControlledValues:    &common.VpaControlledValues,
+			ControlledValues:    &ctrlValues,
 			MinAllowed: corev1.ResourceList{
 				corev1.ResourceCPU:    v.MinAllowedCPU,
 				corev1.ResourceMemory: v.MinAllowedMemory,
@@ -267,7 +275,7 @@ func (v *VpaController) configureVpa(vpaOwner client.Object, vpa *vpav1.Vertical
 		for i := range vpa.Spec.ResourcePolicy.ContainerPolicies {
 			current := &vpa.Spec.ResourcePolicy.ContainerPolicies[i]
 			current.ControlledResources = &resourceList
-			current.ControlledValues = &common.VpaControlledValues
+			current.ControlledValues = &ctrlValues
 			current.MinAllowed = corev1.ResourceList{
 				corev1.ResourceCPU:    v.MinAllowedCPU,
 				corev1.ResourceMemory: v.MinAllowedMemory,

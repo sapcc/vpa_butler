@@ -181,5 +181,27 @@ var _ = Describe("VpaController", func() {
 			}).Should(Equal(vpav1.UpdateModeRecreate))
 		})
 
+		It("updates the controlled values based on the annotation", func() {
+			unmodified := deployment.DeepCopy()
+			deployment.Annotations = map[string]string{
+				controllers.ControlledValuesAnnotationKey: string(vpav1.ContainerControlledValuesRequestsAndLimits),
+			}
+			Expect(k8sClient.Patch(context.Background(), deployment, client.MergeFrom(unmodified))).To(Succeed())
+			Eventually(func() vpav1.ContainerControlledValues {
+				var vpa vpav1.VerticalPodAutoscaler
+				err := k8sClient.Get(context.Background(), types.NamespacedName{
+					Name:      "test-deployment-deployment",
+					Namespace: metav1.NamespaceDefault,
+				}, &vpa)
+				if err != nil {
+					return vpav1.ContainerControlledValues("")
+				}
+				if vpa.Spec.ResourcePolicy == nil || len(vpa.Spec.ResourcePolicy.ContainerPolicies) == 0 {
+					return vpav1.ContainerControlledValues("")
+				}
+				return *vpa.Spec.ResourcePolicy.ContainerPolicies[0].ControlledValues
+			}).Should(Equal(vpav1.ContainerControlledValuesRequestsAndLimits))
+		})
+
 	})
 })
