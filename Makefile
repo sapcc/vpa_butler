@@ -19,9 +19,9 @@ all: bin/$(GOOS)/$(BINARY)
 bin/%/$(BINARY): GIT_COMMIT  = $(shell git rev-parse --short HEAD)
 bin/%/$(BINARY): BUILD_DATE  = $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 bin/%/$(BINARY): $(GOFILES) Makefile
-	CGO_ENABLED=0 GOOS=$* GOARCH=amd64 go build -ldflags '-X main.Version=$(VERSION)' -mod vendor -v -o bin/$*/$(BINARY) ./cmd/vpa_butler/main.go && chmod +x bin/$*/$(BINARY)
+	CGO_ENABLED=0 GOOS=$* GOARCH=amd64 go build -ldflags '-X main.Version=$(VERSION)' -v -o bin/$*/$(BINARY) ./cmd/vpa_butler/main.go && chmod +x bin/$*/$(BINARY)
 
-lint: vendor
+lint:
 	golangci-lint run --timeout=5m
 
 test: lint
@@ -39,6 +39,3 @@ push: build
 
 clean:
 	rm -rf bin/*
-
-vendor:
-	go mod tidy && go mod vendor

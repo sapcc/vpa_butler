@@ -4,7 +4,7 @@ ENV GOTOOLCHAIN=local
 WORKDIR /workspace
 COPY . .
 ARG VERSION
-RUN go mod vendor && VERSION=${VERSION} make all
+RUN VERSION=${VERSION} make all
 
 FROM gcr.io/distroless/static:nonroot
 LABEL source_repository="https://github.com/sapcc/vpa_butler"

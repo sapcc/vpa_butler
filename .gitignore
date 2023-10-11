@@ -1,4 +1,3 @@
 main
-vendor/**
 bin/
 coverprofile.out
