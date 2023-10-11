@@ -85,6 +85,7 @@ func main() {
 		Cache: cache.Options{
 			SyncPeriod: &syncPeriod,
 		},
+		HealthProbeBindAddress: ":8081",
 	})
 
 	handleError(err, "unable to start manager")
