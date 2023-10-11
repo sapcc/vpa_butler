@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/sapcc/vpa_butler/internal/controllers"
+	"github.com/sapcc/vpa_butler/internal/metrics"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	autoscaling "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1"
@@ -66,6 +67,7 @@ func init() {
 
 func main() {
 	flag.Parse()
+	metrics.RegisterMetrics()
 	setGlobals()
 
 	minAllowedCPU := resource.MustParse(defaultMinAllowedCPU)

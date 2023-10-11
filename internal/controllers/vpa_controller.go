@@ -8,6 +8,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	"github.com/sapcc/vpa_butler/internal/common"
+	"github.com/sapcc/vpa_butler/internal/metrics"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -56,6 +57,7 @@ func (v *VpaController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	metrics.RecordContainerRecommendationExcess(vpa)
 	deleted, err := v.cleanupServedVpa(ctx, vpa)
 	if err != nil {
 		return ctrl.Result{}, err

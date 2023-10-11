@@ -161,7 +161,7 @@ func (v *VpaRunnable) reconcileMaxResource(ctx context.Context, target filter.Ta
 
 type patchParams struct {
 	vpa            *vpav1.VerticalPodAutoscaler
-	namedResources []namedResourceList
+	namedResources []common.NamedResourceList
 }
 
 func (v *VpaRunnable) patchMaxRessources(ctx context.Context, params patchParams) error {
@@ -177,10 +177,10 @@ func (v *VpaRunnable) patchMaxRessources(ctx context.Context, params patchParams
 	policies := make([]vpav1.ContainerResourcePolicy, len(params.namedResources))
 	for i, namedResources := range params.namedResources {
 		policies[i] = vpav1.ContainerResourcePolicy{
-			ContainerName:       namedResources.containerName,
+			ContainerName:       namedResources.ContainerName,
 			Mode:                mode,
 			MinAllowed:          minAllowed,
-			MaxAllowed:          namedResources.resources,
+			MaxAllowed:          namedResources.Resources,
 			ControlledResources: controlledResources,
 			ControlledValues:    controlledValues,
 		}
@@ -224,22 +224,17 @@ type resourceDistributionParams struct {
 	capacityPercent int64
 }
 
-type namedResourceList struct {
-	containerName string
-	resources     corev1.ResourceList
-}
+type maxResourceDistributionFunc func(params resourceDistributionParams) []common.NamedResourceList
 
-type maxResourceDistributionFunc func(params resourceDistributionParams) []namedResourceList
-
-func uniformDistribution(params resourceDistributionParams) []namedResourceList {
+func uniformDistribution(params resourceDistributionParams) []common.NamedResourceList {
 	containers := int64(len(params.target.PodSpec.Containers))
 	// distribute a fraction of maximum capacity evenly across containers
 	cpuScaled := scaleQuantityMilli(params.largest.Status.Allocatable.Cpu(), params.capacityPercent/containers)
 	memScaled := scaleQuantity(params.largest.Status.Allocatable.Memory(), params.capacityPercent/containers)
-	return []namedResourceList{
+	return []common.NamedResourceList{
 		{
-			containerName: "*",
-			resources: corev1.ResourceList{
+			ContainerName: "*",
+			Resources: corev1.ResourceList{
 				corev1.ResourceCPU:    *cpuScaled,
 				corev1.ResourceMemory: *memScaled,
 			},
@@ -248,7 +243,7 @@ func uniformDistribution(params resourceDistributionParams) []namedResourceList 
 }
 
 func asymmetricDistribution(mainContainer string) maxResourceDistributionFunc {
-	return func(params resourceDistributionParams) []namedResourceList {
+	return func(params resourceDistributionParams) []common.NamedResourceList {
 		totalFraction, mainFraction := 4, 3
 		containers := params.target.PodSpec.Containers
 		totalWeight := int64(totalFraction * (len(containers) - 1))
@@ -257,17 +252,17 @@ func asymmetricDistribution(mainContainer string) maxResourceDistributionFunc {
 		memMain := scaleQuantity(params.largest.Status.Allocatable.Memory(), params.capacityPercent*mainWeight/totalWeight)
 		cpuOther := scaleQuantityMilli(params.largest.Status.Allocatable.Cpu(), params.capacityPercent/totalWeight)
 		memOther := scaleQuantity(params.largest.Status.Allocatable.Memory(), params.capacityPercent/totalWeight)
-		return []namedResourceList{
+		return []common.NamedResourceList{
 			{
-				containerName: mainContainer,
-				resources: corev1.ResourceList{
+				ContainerName: mainContainer,
+				Resources: corev1.ResourceList{
 					corev1.ResourceCPU:    *cpuMain,
 					corev1.ResourceMemory: *memMain,
 				},
 			},
 			{
-				containerName: "*",
-				resources: corev1.ResourceList{
+				ContainerName: "*",
+				Resources: corev1.ResourceList{
 					corev1.ResourceCPU:    *cpuOther,
 					corev1.ResourceMemory: *memOther,
 				},

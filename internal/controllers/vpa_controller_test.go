@@ -2,6 +2,9 @@ package controllers_test
 
 import (
 	"context"
+	"io"
+	"net/http"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -15,6 +18,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	vpav1 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1"
+	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -36,7 +40,7 @@ var _ = Describe("VpaController", func() {
 		Expect(k8sClient.Delete(context.Background(), node)).To(Succeed())
 	})
 
-	Context("when creating a deployment and a hand-crafted vpa afterwards", func() {
+	When("creating a deployment and a hand-crafted vpa afterwards", func() {
 		var deployment *appsv1.Deployment
 		var vpa *vpav1.VerticalPodAutoscaler
 
@@ -204,4 +208,70 @@ var _ = Describe("VpaController", func() {
 		})
 
 	})
+
+	When("reconciling a vpa", func() {
+		var vpa *vpav1.VerticalPodAutoscaler
+
+		BeforeEach(func() {
+			vpa = &vpav1.VerticalPodAutoscaler{}
+			vpa.Name = "metrics"
+			vpa.Namespace = metav1.NamespaceDefault
+			vpa.Spec.ResourcePolicy = &vpav1.PodResourcePolicy{
+				ContainerPolicies: []vpav1.ContainerResourcePolicy{
+					{
+						ContainerName: "*",
+						MaxAllowed: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("1"),
+							corev1.ResourceMemory: resource.MustParse("1Gi"),
+						},
+					},
+				},
+			}
+			vpa.Status.Recommendation = &vpav1.RecommendedPodResources{
+				ContainerRecommendations: []vpav1.RecommendedContainerResources{
+					{
+						ContainerName: "the-container",
+						UncappedTarget: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("500m"),
+							corev1.ResourceMemory: resource.MustParse("3Gi"),
+						},
+						Target: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("1"),
+							corev1.ResourceMemory: resource.MustParse("1Gi"),
+						},
+					},
+				},
+			}
+			vpa.Spec.TargetRef = &autoscalingv1.CrossVersionObjectReference{
+				Kind:       controllers.StatefulSetStr,
+				Name:       "whatever",
+				APIVersion: "v1",
+			}
+			Expect(k8sClient.Create(context.Background(), vpa)).To(Succeed())
+		})
+
+		AfterEach(func() {
+			Expect(k8sClient.Delete(context.Background(), vpa)).To(Succeed())
+		})
+
+		It("creates recommendation excess metrics", func() {
+			Eventually(func(g Gomega) []string {
+				res, err := http.Get("http://127.0.0.1:8080/metrics")
+				g.Expect(err).To(Succeed())
+				defer res.Body.Close()
+				data, err := io.ReadAll(res.Body)
+				Expect(err).To(Succeed())
+				lines := strings.Split(string(data), "\n")
+				excess := slices.Filter(nil, lines, func(s string) bool {
+					return strings.Contains(s, "vpa_butler_vpa_container_recommendation_excess{")
+				})
+				return excess
+			}).Should(SatisfyAll(
+				ContainElement("vpa_butler_vpa_container_recommendation_excess{container=\"the-container\",namespace=\"default\",resource=\"cpu\",unit=\"core\",verticalpodautoscaler=\"metrics\"} -0.5"),               //nolint:lll
+				ContainElement("vpa_butler_vpa_container_recommendation_excess{container=\"the-container\",namespace=\"default\",resource=\"memory\",unit=\"byte\",verticalpodautoscaler=\"metrics\"} 2.147483648e+09"), //nolint:lll
+			))
+		})
+
+	})
+
 })

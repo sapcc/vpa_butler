@@ -2,6 +2,7 @@ package common
 
 import (
 	autoscaling "k8s.io/api/autoscaling/v1"
+	corev1 "k8s.io/api/core/v1"
 	vpav1 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -24,6 +25,11 @@ var (
 		string(vpav1.ContainerControlledValuesRequestsAndLimits),
 	}
 )
+
+type NamedResourceList struct {
+	ContainerName string
+	Resources     corev1.ResourceList
+}
 
 func ManagedByButler(vpa *vpav1.VerticalPodAutoscaler) bool {
 	if vpa.Annotations == nil {
