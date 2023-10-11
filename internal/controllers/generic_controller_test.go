@@ -40,6 +40,7 @@ var (
 )
 
 func expectVpa(name string) {
+	GinkgoHelper()
 	var vpaRef types.NamespacedName
 	vpaRef.Name = name
 	vpaRef.Namespace = metav1.NamespaceDefault

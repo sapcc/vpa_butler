@@ -20,6 +20,7 @@ import (
 )
 
 func expectMaxResources(name, cpu, mem string) {
+	GinkgoHelper()
 	Eventually(func() error {
 		var vpaRef types.NamespacedName
 		vpaRef.Name = name
@@ -179,6 +180,7 @@ var _ = Describe("VpaRunnable", func() {
 	When("having a second differently sized node", func() {
 		var secondNode *corev1.Node
 		var deployment *appsv1.Deployment
+		var daemonSet *appsv1.DaemonSet
 
 		BeforeEach(func() {
 			secondNode = &corev1.Node{}
@@ -190,16 +192,24 @@ var _ = Describe("VpaRunnable", func() {
 			Expect(k8sClient.Create(context.Background(), secondNode))
 			deployment = makeDeployment()
 			Expect(k8sClient.Create(context.Background(), deployment)).To(Succeed())
+			daemonSet = makeDaemonSet()
+			Expect(k8sClient.Create(context.Background(), daemonSet)).To(Succeed())
 		})
 
 		AfterEach(func() {
+			deleteVpa("test-daemonset-daemonset")
 			deleteVpa(deploymentName + "-deployment")
+			Expect(k8sClient.Delete(context.Background(), daemonSet))
 			Expect(k8sClient.Delete(context.Background(), deployment))
 			Expect(k8sClient.Delete(context.Background(), secondNode))
 		})
 
-		It("prefers the node with the most memory for setting the maximum allowed resources", func() {
+		It("prefers the node with the most memory for setting maximum allowed resources for non-daemonsets", func() {
 			expectMaxResources(deploymentName+"-deployment", "900m", "1800")
+		})
+
+		It("prefers the node with the least memory for setting maximum allowed resources for daemonsets", func() {
+			expectMaxResources("test-daemonset-daemonset", "3600m", "450")
 		})
 	})
 

@@ -80,6 +80,7 @@ func (v *VpaRunnable) extractTarget(ctx context.Context, vpa *vpav1.VerticalPodA
 				vpa.Namespace, ref.Name, ref.Kind)
 		}
 		return filter.TargetedVpa{
+			Type:       filter.TargetDeployment,
 			Vpa:        vpa,
 			PodSpec:    deployment.Spec.Template.Spec,
 			Selector:   *deployment.Spec.Selector,
@@ -93,6 +94,7 @@ func (v *VpaRunnable) extractTarget(ctx context.Context, vpa *vpav1.VerticalPodA
 				vpa.Namespace, ref.Name, ref.Kind)
 		}
 		return filter.TargetedVpa{
+			Type:       filter.TargetStatefulSet,
 			Vpa:        vpa,
 			PodSpec:    sts.Spec.Template.Spec,
 			Selector:   *sts.Spec.Selector,
@@ -106,6 +108,7 @@ func (v *VpaRunnable) extractTarget(ctx context.Context, vpa *vpav1.VerticalPodA
 				vpa.Namespace, ref.Name, ref.Kind)
 		}
 		return filter.TargetedVpa{
+			Type:       filter.TargetDaemonSet,
 			Vpa:        vpa,
 			PodSpec:    ds.Spec.Template.Spec,
 			Selector:   *ds.Spec.Selector,
@@ -132,7 +135,15 @@ func (v *VpaRunnable) reconcileMaxResource(ctx context.Context, target filter.Ta
 			distributionFunc = asymmetricDistribution(mainContainer)
 		}
 	}
-	largest := maxByMemory(viable)
+	var largest corev1.Node
+	// DaemonSets needs to fit onto all nodes their pods can be placed on.
+	// Therefore the smallest of them is used to derive an upper recommendation
+	// bound. Other payloads usually create less pods.
+	if target.Type == filter.TargetDaemonSet {
+		largest = minByMemory(viable)
+	} else {
+		largest = maxByMemory(viable)
+	}
 	err = v.patchMaxRessources(ctx, patchParams{
 		vpa: target.Vpa,
 		namedResources: distributionFunc(resourceDistributionParams{
@@ -186,6 +197,17 @@ func maxByMemory(nodes []corev1.Node) corev1.Node {
 		}
 	}
 	return maxNode
+}
+
+func minByMemory(nodes []corev1.Node) corev1.Node {
+	var minNode corev1.Node
+	minNode.Status.Allocatable = corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("128Ti")}
+	for _, node := range nodes {
+		if node.Status.Allocatable.Memory().Cmp(*minNode.Status.Allocatable.Memory()) == -1 {
+			minNode = node
+		}
+	}
+	return minNode
 }
 
 func scaleQuantityMilli(q *resource.Quantity, percent int64) *resource.Quantity {

@@ -18,7 +18,16 @@ func Schedulable(nodes []corev1.Node) []corev1.Node {
 	return schedulable
 }
 
+type TargetType int
+
+const (
+	TargetDeployment TargetType = iota
+	TargetStatefulSet
+	TargetDaemonSet
+)
+
 type TargetedVpa struct {
+	Type       TargetType
 	Vpa        *vpav1.VerticalPodAutoscaler
 	PodSpec    corev1.PodSpec
 	Selector   metav1.LabelSelector
