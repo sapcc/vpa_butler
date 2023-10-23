@@ -10,7 +10,7 @@ require (
 	github.com/prometheus/client_golang v1.17.0
 	k8s.io/api v0.28.2
 	k8s.io/apimachinery v0.28.2
-	k8s.io/autoscaler/vertical-pod-autoscaler v0.14.0
+	k8s.io/autoscaler/vertical-pod-autoscaler v1.0.0
 	k8s.io/client-go v0.28.2
 	k8s.io/component-helpers v0.28.2
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
