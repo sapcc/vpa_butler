@@ -19,6 +19,10 @@ import (
 	vpav1 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1"
 )
 
+const (
+	deployVpaName = deploymentName + "-deployment"
+)
+
 func expectMaxResources(name, cpu, mem string) {
 	GinkgoHelper()
 	Eventually(func() error {
@@ -78,11 +82,11 @@ var _ = Describe("VpaRunnable", func() {
 		})
 
 		It("sets maximum allocatable resources", func() {
-			expectMaxResources(deploymentName+"-deployment", "900m", "1800")
+			expectMaxResources(deployVpaName, "900m", "1800")
 		})
 
 		AfterEach(func() {
-			deleteVpa(deploymentName + "-deployment")
+			deleteVpa(deployVpaName)
 			Expect(k8sClient.Delete(context.Background(), deployment))
 		})
 
@@ -198,14 +202,14 @@ var _ = Describe("VpaRunnable", func() {
 
 		AfterEach(func() {
 			deleteVpa("test-daemonset-daemonset")
-			deleteVpa(deploymentName + "-deployment")
+			deleteVpa(deployVpaName)
 			Expect(k8sClient.Delete(context.Background(), daemonSet))
 			Expect(k8sClient.Delete(context.Background(), deployment))
 			Expect(k8sClient.Delete(context.Background(), secondNode))
 		})
 
 		It("prefers the node with the most memory for setting maximum allowed resources for non-daemonsets", func() {
-			expectMaxResources(deploymentName+"-deployment", "900m", "1800")
+			expectMaxResources(deployVpaName, "900m", "1800")
 		})
 
 		It("prefers the node with the least memory for setting maximum allowed resources for daemonsets", func() {
@@ -226,7 +230,7 @@ var _ = Describe("VpaRunnable", func() {
 		})
 
 		It("distributes maximum allocatable resources evenly", func() {
-			expectMaxResources(deploymentName+"-deployment", "450m", "900")
+			expectMaxResources(deployVpaName, "450m", "900")
 		})
 
 		It("distributes resources asymmetrical if a main container is annotated", func() {
@@ -234,7 +238,7 @@ var _ = Describe("VpaRunnable", func() {
 			deployment.Annotations = map[string]string{controllers.MainContainerAnnotationKey: "next"}
 			Expect(k8sClient.Patch(context.Background(), deployment, client.MergeFrom(unmodified))).To(Succeed())
 			var vpaRef types.NamespacedName
-			vpaRef.Name = deploymentName + "-deployment"
+			vpaRef.Name = deployVpaName
 			vpaRef.Namespace = metav1.NamespaceDefault
 
 			var vpa vpav1.VerticalPodAutoscaler
@@ -256,7 +260,7 @@ var _ = Describe("VpaRunnable", func() {
 		})
 
 		AfterEach(func() {
-			deleteVpa(deploymentName + "-deployment")
+			deleteVpa(deployVpaName)
 			Expect(k8sClient.Delete(context.Background(), deployment))
 		})
 	})

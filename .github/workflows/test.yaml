@@ -20,7 +20,7 @@ jobs:
         uses: golangci/golangci-lint-action@v3
         with:
           # always uses the latest patch version.
-          version: v1.52
+          version: v1.55
           args: "--timeout 5m"
   
   vulncheck:
@@ -55,8 +55,8 @@ jobs:
 
       - name: Install Ginkgo CLI
         run: |
-          go install github.com/onsi/ginkgo/v2/ginkgo@v2.12.1
-          go install sigs.k8s.io/controller-runtime/tools/setup-envtest@v0.0.0-20230720032208-b1d6919d3e12
+          go install github.com/onsi/ginkgo/v2/ginkgo@v2.13.1
+          go install sigs.k8s.io/controller-runtime/tools/setup-envtest@v0.0.0-20231114105341-b81fc66fded5
 
       - name: Run tests
         run: |
