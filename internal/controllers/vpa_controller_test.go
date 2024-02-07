@@ -245,7 +245,7 @@ var _ = Describe("VpaController", func() {
 			vpa.Spec.TargetRef = &autoscalingv1.CrossVersionObjectReference{
 				Kind:       controllers.StatefulSetStr,
 				Name:       "whatever",
-				APIVersion: "v1",
+				APIVersion: "apps/v1",
 			}
 			Expect(k8sClient.Create(context.Background(), vpa)).To(Succeed())
 		})

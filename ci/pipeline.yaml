@@ -1,22 +1,131 @@
+resource_types:
+- name: git-proxy
+  type: registry-image
+  check_every: 24h
+  source:
+    repository: keppel.eu-de-1.cloud.sap/ccloud/concourse-git-resource-proxy
+    tag: latest
+- name: github-release
+  type: registry-image
+  check_every: 24h
+  source:
+    repository: keppel.eu-de-1.cloud.sap/ccloud/concourse-github-release-resource
 resources:
-  - name: vpa_butler.git
+  - name: vpa-butler.git
     type: git
     source:
       uri: https://github.com/sapcc/vpa_butler.git
       branch: main
-  - name: vpa_butler.image
-    type: docker-image
+  - name: release.github
+    type: github-release
+    source:
+      owner: sapcc
+      repository: vpa_butler
+      access_token: ((github-access-token/sapcc-bot))
+      order_by: time
+  - name: secrets.git
+    type: git-proxy
+    check_every: 1h
+    source:
+      uri: git@github.wdf.sap.corp:cc/secrets.git
+      private_key: ((github-private-key/cc-secrets))
+      branch: master
+  - name: vpa-butler.image
+    type: registry-image
     check_every: 24h
     source:
       username: ((registry-user/keppel-ccloud.username))
       password: ((registry-user/keppel-ccloud.password))
       repository: keppel.eu-de-1.cloud.sap/ccloud/vpa_butler
-      tag: latest
 
 jobs:
-  - name: build-vpa_butler
-    plan:
-      - get: vpa_butler.git
-      - put: vpa_butler.image
-        params:
-          build: .
+- name: build-test-image
+  plan:
+  - in_parallel:
+    - get: vpa-butler.git
+      trigger: yes
+    - get: secrets.git
+  - load_var: version
+    file: vpa-butler.git/.git/ref
+  - task: inject-docker-hub-mirror
+    file: secrets.git/ci/shared/task-inject-dockerhub-mirror.yaml
+    input_mapping: { source: vpa-butler.git }
+  - task: build-image
+    privileged: true
+    params:
+      BUILD_ARG_VERSION: ((.:version))
+    config:
+      platform: linux
+      image_resource:
+        type: registry-image
+        source:
+          repository: keppel.eu-de-1.cloud.sap/ccloud-dockerhub-mirror/concourse/oci-build-task
+      inputs:
+      - name: vpa-butler.git
+      outputs:
+      - name: image
+      params:
+        CONTEXT: vpa-butler.git
+      run:
+        path: build
+  - put: vpa-butler.image
+    params:
+      image: image/image.tar
+      additional_tags: vpa-butler.git/.git/ref
+- name: build-release-image
+  plan:
+  - in_parallel:
+    - get: release.github
+      trigger: yes
+      params:
+        include_source_tarball: true
+    - get: secrets.git
+  - task: untar
+    config:
+      platform: linux
+      image_resource:
+        type: docker-image
+        source:
+          repository: keppel.eu-de-1.cloud.sap/ccloud-dockerhub-mirror/library/busybox
+          tag: latest
+          username: ((registry-user/keppel-ccloud.username))
+          password: ((registry-user/keppel-ccloud.password))
+      inputs:
+      - name: release.github
+      run:
+        path: /bin/sh
+        args: 
+        - -cx
+        - |
+          tar -xvzf release.github/source.tar.gz
+          REF=$(cat release.github/commit_sha | cut -c1-7)
+          mv sapcc-vpa_butler-$REF/* source
+          cat release.github/tag > source/docker_tag
+      outputs:
+      - name: source
+  - load_var: version
+    file: release.github/tag
+  - task: inject-docker-hub-mirror
+    file: secrets.git/ci/shared/task-inject-dockerhub-mirror.yaml
+  - task: build-image
+    privileged: true
+    params:
+      BUILD_ARG_VERSION: ((.:version))
+    config:
+      platform: linux
+      image_resource:
+        type: registry-image
+        source:
+          repository: keppel.eu-de-1.cloud.sap/ccloud-dockerhub-mirror/concourse/oci-build-task
+      inputs:
+      - name: source
+      outputs:
+      - name: image
+      params:
+        CONTEXT: source
+      run:
+        path: build
+  - put: vpa-butler.image
+    params:
+      image: image/image.tar
+      additional_tags: source/docker_tag

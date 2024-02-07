@@ -63,6 +63,7 @@ func (v *GenericController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		err = v.ensureVpaDeleted(ctx, instance)
 		return ctrl.Result{}, err
 	}
+	v.Log.Info("Serving VPA for", "name", req.Name, "namespace", req.Namespace)
 	var vpa = new(vpav1.VerticalPodAutoscaler)
 	vpa.Namespace = instance.GetNamespace()
 	vpa.Name = getVpaName(instance)
@@ -92,7 +93,7 @@ func (v *GenericController) shouldServeVpa(ctx context.Context, vpaOwner client.
 		// vpa matches the vpa owner
 		if vpa.Spec.TargetRef.Name == vpaOwner.GetName() &&
 			vpa.Spec.TargetRef.Kind == vpaOwner.GetObjectKind().GroupVersionKind().Kind &&
-			vpa.Spec.TargetRef.APIVersion == vpaOwner.GetObjectKind().GroupVersionKind().Version {
+			vpa.Spec.TargetRef.APIVersion == vpaOwner.GetObjectKind().GroupVersionKind().GroupVersion().String() {
 			managed := common.ManagedByButler(&vpa)
 			if !managed {
 				// there is a hand-crafted vpa targeting a resource the butler cares about

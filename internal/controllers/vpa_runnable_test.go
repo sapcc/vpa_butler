@@ -140,7 +140,7 @@ var _ = Describe("VpaRunnable", func() {
 			vpa.Spec.TargetRef = &autoscalingv1.CrossVersionObjectReference{
 				Name:       deploymentName,
 				Kind:       controllers.DeploymentStr,
-				APIVersion: "v1",
+				APIVersion: "apps/v1",
 			}
 			vpa.Spec.ResourcePolicy = &vpav1.PodResourcePolicy{
 				ContainerPolicies: []vpav1.ContainerResourcePolicy{
