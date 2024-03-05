@@ -1,0 +1,24 @@
+# Configuration file for <https://github.com/sapcc/go-makefile-maker>
+
+metadata:
+  url: https://github.com/sapcc/vpa_butler
+
+binaries:
+  - name:        vpa_butler
+    fromPackage: ./cmd/vpa_butler
+    installTo:   bin/
+
+golang:
+  setGoModVersion: true
+
+githubWorkflow:
+  global:
+    defaultBranch: main
+  license:
+    enabled: true
+  securityChecks:
+    enabled: true
+
+verbatim: |
+  fly:
+    fly -t ci1 set-pipeline -p secrets-injector -c ci/pipeline.yaml

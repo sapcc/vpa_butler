@@ -1,3 +1,2 @@
-main
-bin/
-coverprofile.out
+build/
+testbin/

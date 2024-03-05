@@ -13,7 +13,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.22'
           check-latest: true
 
       - name: golangci-lint
@@ -22,24 +22,6 @@ jobs:
           # always uses the latest patch version.
           version: v1.55
           args: "--timeout 5m"
-  
-  vulncheck:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.21'
-          check-latest: true
-
-      - name: Install govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@latest
-
-      - name: Run govulncheck
-        run: govulncheck ./...
   
   test:
     runs-on: ubuntu-latest
@@ -50,19 +32,14 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.22'
           check-latest: true
-
-      - name: Install Ginkgo CLI
-        run: |
-          go install github.com/onsi/ginkgo/v2/ginkgo@v2.13.1
-          go install sigs.k8s.io/controller-runtime/tools/setup-envtest@v0.0.0-20231114105341-b81fc66fded5
 
       - name: Run tests
         run: |
-          make cover -o lint
+          make build/cover.out
 
       - name: Upload coverage results to coveralls
         uses: shogo82148/actions-goveralls@v1
         with:
-          path-to-profile: coverprofile.out
+          path-to-profile: build/cover.out
