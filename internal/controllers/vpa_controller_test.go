@@ -64,14 +64,14 @@ var _ = Describe("VpaController", func() {
 		})
 
 		AfterEach(func() {
-			deleteVpa("test-deployment-custom-vpa")
+			deleteVpa(deploymentCustomVpaName)
 			deleteVpa("test-deployment-deployment")
 			Expect(k8sClient.Delete(context.Background(), deployment)).To(Succeed())
 		})
 
 		It("should delete the served vpa for apps/v1", func() {
 			vpa = &vpav1.VerticalPodAutoscaler{}
-			vpa.Name = "test-deployment-custom-vpa"
+			vpa.Name = deploymentCustomVpaName
 			vpa.Namespace = metav1.NamespaceDefault
 			vpa.Spec.TargetRef = &autoscalingv1.CrossVersionObjectReference{
 				Name:       deploymentName,
@@ -91,7 +91,7 @@ var _ = Describe("VpaController", func() {
 
 		It("should delete the served vpa for v1", func() {
 			vpa = &vpav1.VerticalPodAutoscaler{}
-			vpa.Name = "test-deployment-custom-vpa"
+			vpa.Name = deploymentCustomVpaName
 			vpa.Namespace = metav1.NamespaceDefault
 			vpa.Spec.TargetRef = &autoscalingv1.CrossVersionObjectReference{
 				Name:       deploymentName,
@@ -122,7 +122,7 @@ var _ = Describe("VpaController", func() {
 			Expect(k8sClient.Patch(context.Background(), deployment, client.MergeFrom(unmodified))).To(Succeed())
 
 			vpa = &vpav1.VerticalPodAutoscaler{}
-			vpa.Name = "test-deployment-custom-vpa"
+			vpa.Name = deploymentCustomVpaName
 			vpa.Namespace = metav1.NamespaceDefault
 			vpa.Spec.TargetRef = &autoscalingv1.CrossVersionObjectReference{
 				Name:       deploymentName,

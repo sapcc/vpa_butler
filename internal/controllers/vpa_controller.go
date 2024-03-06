@@ -71,11 +71,9 @@ func (v *VpaController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	if err := v.Get(ctx, req.NamespacedName, vpa); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-	if common.ManagedByButler(vpa) {
-		deleted, err := v.deleteOrphanedVpa(ctx, vpa)
-		if err != nil || deleted {
-			return ctrl.Result{}, err
-		}
+	deleted, err := v.deleteOrphanedVpa(ctx, vpa)
+	if err != nil || deleted {
+		return ctrl.Result{}, err
 	}
 
 	metrics.RecordContainerRecommendationExcess(vpa)
@@ -83,7 +81,7 @@ func (v *VpaController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	deleted, err := v.cleanupServedVpa(ctx, cleanupParams{vpa: vpa, target: target})
+	deleted, err = v.cleanupServedVpa(ctx, cleanupParams{vpa: vpa, target: target})
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -199,6 +197,9 @@ func (v *VpaController) deleteOldVpa(ctx context.Context, vpa *vpav1.VerticalPod
 // Compared to finalizers on the targets (deployments,...) this approach is more
 // lazy as the vpa needs to be reconciled, but it does not put finalizers on critical resources.
 func (v *VpaController) deleteOrphanedVpa(ctx context.Context, vpa *vpav1.VerticalPodAutoscaler) (bool, error) {
+	if !common.ManagedByButler(vpa) {
+		return false, nil
+	}
 	if vpa.Spec.TargetRef == nil {
 		v.Log.Info("Deleting Vpa with orphaned target")
 		return true, v.Delete(ctx, vpa)
