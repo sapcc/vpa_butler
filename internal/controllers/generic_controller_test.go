@@ -245,4 +245,50 @@ var _ = Describe("GenericController", func() {
 
 	})
 
+	Context("when creating a vpa targeting the owner of a deployment", func() {
+		var vpa *vpav1.VerticalPodAutoscaler
+		var deployment *appsv1.Deployment
+
+		BeforeEach(func() {
+			vpa = &vpav1.VerticalPodAutoscaler{}
+			vpa.Name = deploymentCustomVpaName
+			vpa.Namespace = metav1.NamespaceDefault
+			vpa.Spec.TargetRef = &autoscalingv1.CrossVersionObjectReference{
+				Name:       deploymentName,
+				Kind:       controllers.DeploymentStr + "Owner",
+				APIVersion: "apps/v1",
+			}
+			Expect(k8sClient.Create(context.Background(), vpa)).To(Succeed())
+			deployment = makeDeployment()
+			deployment.OwnerReferences = []metav1.OwnerReference{
+				{
+					APIVersion: vpa.Spec.TargetRef.APIVersion,
+					Kind:       vpa.Spec.TargetRef.Kind,
+					Name:       vpa.Spec.TargetRef.Name,
+					UID:        vpa.UID, // makes no sense, but passes validation
+				},
+			}
+			Expect(k8sClient.Create(context.Background(), deployment)).To(Succeed())
+		})
+
+		AfterEach(func() {
+			Expect(k8sClient.Delete(context.Background(), deployment)).To(Succeed())
+			deleteVpa(deploymentCustomVpaName)
+			deleteVpa("test-deployment-deployment")
+		})
+
+		It("does not serve a vpa", func() {
+			var vpa vpav1.VerticalPodAutoscaler
+			Consistently(func(g Gomega) error {
+				defer GinkgoRecover()
+				err := k8sClient.Get(context.Background(), types.NamespacedName{
+					Name:      "test-deployment-deployment",
+					Namespace: metav1.NamespaceDefault,
+				}, &vpa)
+				g.Expect(err).To(HaveOccurred())
+				return err
+			}).Should(Satisfy(errors.IsNotFound))
+		})
+	})
+
 })

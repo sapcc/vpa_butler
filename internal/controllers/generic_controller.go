@@ -23,6 +23,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/sapcc/vpa_butler/internal/common"
 	appsv1 "k8s.io/api/apps/v1"
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -94,6 +95,20 @@ func (v *GenericController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 }
 
 func (v *GenericController) shouldServeVpa(ctx context.Context, vpaOwner client.Object) (bool, error) {
+	ownerRefs := []autoscalingv1.CrossVersionObjectReference{{
+		Name:       vpaOwner.GetName(),
+		Kind:       vpaOwner.GetObjectKind().GroupVersionKind().Kind,
+		APIVersion: vpaOwner.GetObjectKind().GroupVersionKind().GroupVersion().String(),
+	}}
+	owners := vpaOwner.GetOwnerReferences()
+	for _, owner := range owners {
+		ownerRefs = append(ownerRefs, autoscalingv1.CrossVersionObjectReference{
+			Kind:       owner.Kind,
+			Name:       owner.Name,
+			APIVersion: owner.APIVersion,
+		})
+	}
+
 	var vpas vpav1.VerticalPodAutoscalerList
 	err := v.Client.List(ctx, &vpas, client.InNamespace(vpaOwner.GetNamespace()))
 	if err != nil {
@@ -101,15 +116,14 @@ func (v *GenericController) shouldServeVpa(ctx context.Context, vpaOwner client.
 	}
 	for i := range vpas.Items {
 		vpa := vpas.Items[i]
-		if vpa.Spec.TargetRef == nil {
+		if vpa.Spec.TargetRef == nil || common.ManagedByButler(&vpa) {
 			continue
 		}
-		// vpa matches the vpa owner
-		if vpa.Spec.TargetRef.Name == vpaOwner.GetName() &&
-			vpa.Spec.TargetRef.Kind == vpaOwner.GetObjectKind().GroupVersionKind().Kind &&
-			vpa.Spec.TargetRef.APIVersion == vpaOwner.GetObjectKind().GroupVersionKind().GroupVersion().String() {
-			managed := common.ManagedByButler(&vpa)
-			if !managed {
+		for _, owner := range ownerRefs {
+			// vpa matches the vpa owner
+			if vpa.Spec.TargetRef.Name == owner.Name &&
+				vpa.Spec.TargetRef.Kind == owner.Kind &&
+				vpa.Spec.TargetRef.APIVersion == owner.APIVersion {
 				// there is a hand-crafted vpa targeting a resource the butler cares about
 				// so the served vpa needs to be deleted
 				return false, nil

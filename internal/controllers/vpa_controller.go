@@ -24,6 +24,7 @@ import (
 	"github.com/sapcc/vpa_butler/internal/common"
 	"github.com/sapcc/vpa_butler/internal/metrics"
 	appsv1 "k8s.io/api/apps/v1"
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -70,9 +71,19 @@ func (v *VpaController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	if err := v.Get(ctx, req.NamespacedName, vpa); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+	if common.ManagedByButler(vpa) {
+		deleted, err := v.deleteOrphanedVpa(ctx, vpa)
+		if err != nil || deleted {
+			return ctrl.Result{}, err
+		}
+	}
 
 	metrics.RecordContainerRecommendationExcess(vpa)
-	deleted, err := v.cleanupServedVpa(ctx, vpa)
+	target, err := v.extractTarget(ctx, vpa)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	deleted, err := v.cleanupServedVpa(ctx, cleanupParams{vpa: vpa, target: target})
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -81,15 +92,6 @@ func (v *VpaController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	}
 	deleted, err = v.deleteOldVpa(ctx, vpa)
 	if err != nil || deleted {
-		return ctrl.Result{}, err
-	}
-	deleted, err = v.deleteOrphanedVpa(ctx, vpa)
-	if err != nil || deleted {
-		return ctrl.Result{}, err
-	}
-
-	target, err := v.extractTarget(ctx, vpa)
-	if err != nil {
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{}, v.reconcileVpa(ctx, target)
@@ -130,14 +132,19 @@ func (v *VpaController) extractTarget(ctx context.Context, vpa *vpav1.VerticalPo
 		ref.Kind, vpa.Namespace, vpa.Name)
 }
 
+type cleanupParams struct {
+	vpa    *vpav1.VerticalPodAutoscaler
+	target client.Object
+}
+
 // When there is a hand-crafted vpa targeting the same object as a served vpa the served one needs to be deleted.
 // This functions returns true, when vpa currently being reconciled has been deleted.
-func (v *VpaController) cleanupServedVpa(ctx context.Context, reconcileVpa *vpav1.VerticalPodAutoscaler) (bool, error) {
-	if reconcileVpa.Spec.TargetRef == nil {
+func (v *VpaController) cleanupServedVpa(ctx context.Context, params cleanupParams) (bool, error) {
+	if params.vpa.Spec.TargetRef == nil {
 		return false, nil
 	}
 	var vpas = new(vpav1.VerticalPodAutoscalerList)
-	if err := v.List(ctx, vpas, client.InNamespace(reconcileVpa.GetNamespace())); err != nil {
+	if err := v.List(ctx, vpas, client.InNamespace(params.vpa.GetNamespace())); err != nil {
 		return false, err
 	}
 	// There are two cases to consider:
@@ -150,7 +157,7 @@ func (v *VpaController) cleanupServedVpa(ctx context.Context, reconcileVpa *vpav
 	//    return early.
 	for i := range vpas.Items {
 		vpa := vpas.Items[i]
-		if !equalTarget(&vpa, reconcileVpa) || vpa.UID == reconcileVpa.UID {
+		if !equalTargetAcrossOwnerRefs(&vpa, params) {
 			continue
 		}
 		if common.ManagedByButler(&vpa) {
@@ -161,12 +168,12 @@ func (v *VpaController) cleanupServedVpa(ctx context.Context, reconcileVpa *vpav
 				"namespace", vpa.GetNamespace(), "name", vpa.GetName())
 			return false, nil
 		}
-		if common.ManagedByButler(reconcileVpa) {
-			if err := v.Delete(ctx, reconcileVpa); err != nil {
+		if common.ManagedByButler(params.vpa) {
+			if err := v.Delete(ctx, params.vpa); err != nil {
 				return false, err
 			}
 			v.Log.Info("Deleted served vpa as a custom vpa was created",
-				"namespace", reconcileVpa.GetNamespace(), "name", reconcileVpa.GetName())
+				"namespace", params.vpa.GetNamespace(), "name", params.vpa.GetName())
 			return true, nil
 		}
 	}
@@ -314,23 +321,41 @@ func isNewNamingSchema(name string) bool {
 	return false
 }
 
-func equalTarget(a, b *vpav1.VerticalPodAutoscaler) bool {
-	if a.Spec.TargetRef == nil || b.Spec.TargetRef == nil {
+func equalTargetAcrossOwnerRefs(vpa *vpav1.VerticalPodAutoscaler, params cleanupParams) bool {
+	sameTarget := false
+	if equalTarget(vpa.Spec.TargetRef, params.vpa.Spec.TargetRef) && vpa.UID != params.vpa.UID {
+		sameTarget = true
+	}
+	for _, owner := range params.target.GetOwnerReferences() {
+		crossRef := &autoscalingv1.CrossVersionObjectReference{
+			Kind:       owner.Kind,
+			Name:       owner.Name,
+			APIVersion: owner.APIVersion,
+		}
+		if equalTarget(vpa.Spec.TargetRef, crossRef) && vpa.UID != params.vpa.UID {
+			sameTarget = true
+		}
+	}
+	return sameTarget
+}
+
+func equalTarget(a, b *autoscalingv1.CrossVersionObjectReference) bool {
+	if a == nil || b == nil {
 		return false
 	}
 	// apparently the apiVersion is currently not considered by the
 	// vpa so v1 and apps/v1 work for deployments etc., so ignore
 	// the prefix if only one apiVersion has a prefix
 	apiEqual := false
-	aSplitted := strings.Split(a.Spec.TargetRef.APIVersion, "/")
-	bSplitted := strings.Split(b.Spec.TargetRef.APIVersion, "/")
+	aSplitted := strings.Split(a.APIVersion, "/")
+	bSplitted := strings.Split(b.APIVersion, "/")
 	if len(aSplitted) == len(bSplitted) {
-		apiEqual = a.Spec.TargetRef.APIVersion == b.Spec.TargetRef.APIVersion
+		apiEqual = a.APIVersion == b.APIVersion
 	} else {
 		apiEqual = aSplitted[len(aSplitted)-1] == bSplitted[len(bSplitted)-1]
 	}
 
-	return a.Spec.TargetRef.Name == b.Spec.TargetRef.Name &&
-		a.Spec.TargetRef.Kind == b.Spec.TargetRef.Kind &&
+	return a.Name == b.Name &&
+		a.Kind == b.Kind &&
 		apiEqual
 }

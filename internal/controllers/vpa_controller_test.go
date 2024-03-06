@@ -109,6 +109,37 @@ var _ = Describe("VpaController", func() {
 			}).ShouldNot(Succeed())
 		})
 
+		It("should delete the served vpa if the targets owner is targeted", func() {
+			unmodified := deployment.DeepCopy()
+			deployment.OwnerReferences = []metav1.OwnerReference{
+				{
+					APIVersion: "apps/v1",
+					Kind:       "DeploymentOwner",
+					Name:       deployment.Name,
+					UID:        deployment.UID, // makes no sense, but passes validation
+				},
+			}
+			Expect(k8sClient.Patch(context.Background(), deployment, client.MergeFrom(unmodified))).To(Succeed())
+
+			vpa = &vpav1.VerticalPodAutoscaler{}
+			vpa.Name = "test-deployment-custom-vpa"
+			vpa.Namespace = metav1.NamespaceDefault
+			vpa.Spec.TargetRef = &autoscalingv1.CrossVersionObjectReference{
+				Name:       deploymentName,
+				APIVersion: "apps/v1",
+				Kind:       "DeploymentOwner",
+			}
+			Expect(k8sClient.Create(context.Background(), vpa)).To(Succeed())
+			Eventually(func() error {
+				var vpa vpav1.VerticalPodAutoscaler
+				err := k8sClient.Get(context.Background(), types.NamespacedName{
+					Name:      "test-deployment-deployment",
+					Namespace: metav1.NamespaceDefault,
+				}, &vpa)
+				return err
+			}).ShouldNot(Succeed())
+		})
+
 	})
 
 	When("creating a deployment", func() {
