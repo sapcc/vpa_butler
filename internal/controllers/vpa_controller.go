@@ -95,6 +95,7 @@ func (v *VpaController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	return ctrl.Result{}, v.reconcileVpa(ctx, target)
 }
 
+// Returns nil and no error, if the target kind is not considered by the vpa_butler.
 func (v *VpaController) extractTarget(ctx context.Context, vpa *vpav1.VerticalPodAutoscaler) (client.Object, error) {
 	if vpa.Spec.TargetRef == nil {
 		return nil, fmt.Errorf("vpa %s/%s has nil target ref", vpa.Namespace, vpa.Name)
@@ -126,8 +127,8 @@ func (v *VpaController) extractTarget(ctx context.Context, vpa *vpav1.VerticalPo
 		}
 		return &ds, nil
 	}
-	return nil, fmt.Errorf("unknown target kind %s for vpa %s/%s encountered",
-		ref.Kind, vpa.Namespace, vpa.Name)
+	v.Log.Info("unknown target kind", "kind", ref.Kind, "name", vpa.Name, "namespace", vpa.Namespace)
+	return nil, nil
 }
 
 type cleanupParams struct {
@@ -323,10 +324,13 @@ func isNewNamingSchema(name string) bool {
 }
 
 func equalTargetAcrossOwnerRefs(vpa *vpav1.VerticalPodAutoscaler, params cleanupParams) bool {
-	sameTarget := false
 	if equalTarget(vpa.Spec.TargetRef, params.vpa.Spec.TargetRef) && vpa.UID != params.vpa.UID {
-		sameTarget = true
+		return true
 	}
+	if params.target == nil {
+		return false
+	}
+	sameTarget := false
 	for _, owner := range params.target.GetOwnerReferences() {
 		crossRef := &autoscalingv1.CrossVersionObjectReference{
 			Kind:       owner.Kind,
