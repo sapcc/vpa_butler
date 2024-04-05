@@ -11,6 +11,9 @@ binaries:
 golang:
   setGoModVersion: true
 
+golangciLint:
+  createConfig: true
+
 githubWorkflow:
   ci:
     enabled: true
