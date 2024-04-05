@@ -12,12 +12,16 @@ golang:
   setGoModVersion: true
 
 githubWorkflow:
+  ci:
+    enabled: true
   global:
     defaultBranch: main
-  license:
-    enabled: true
-  securityChecks:
-    enabled: true
+
+renovate:
+  enabled: true
+  assignees:
+    - Nuckal777
+    - SuperSandro2000
 
 verbatim: |
   fly:
