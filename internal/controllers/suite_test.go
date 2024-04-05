@@ -21,8 +21,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/sapcc/vpa_butler/internal/controllers"
-	"github.com/sapcc/vpa_butler/internal/metrics"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -32,6 +30,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
+	"github.com/sapcc/vpa_butler/internal/controllers"
+	"github.com/sapcc/vpa_butler/internal/metrics"
 )
 
 func TestControllers(t *testing.T) {

@@ -20,8 +20,6 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/sapcc/vpa_butler/internal/common"
-	"github.com/sapcc/vpa_butler/internal/filter"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -29,6 +27,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	vpav1 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/sapcc/vpa_butler/internal/common"
+	"github.com/sapcc/vpa_butler/internal/filter"
 )
 
 const scaleDivisor int64 = 100

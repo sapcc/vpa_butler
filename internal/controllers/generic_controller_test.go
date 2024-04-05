@@ -20,6 +20,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	"github.com/sapcc/vpa_butler/internal/common"
 	"github.com/sapcc/vpa_butler/internal/controllers"
 

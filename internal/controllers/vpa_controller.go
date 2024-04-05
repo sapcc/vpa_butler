@@ -21,8 +21,6 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
-	"github.com/sapcc/vpa_butler/internal/common"
-	"github.com/sapcc/vpa_butler/internal/metrics"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -38,6 +36,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
+	"github.com/sapcc/vpa_butler/internal/common"
+	"github.com/sapcc/vpa_butler/internal/metrics"
 )
 
 const (

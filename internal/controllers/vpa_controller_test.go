@@ -22,8 +22,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/sapcc/vpa_butler/internal/common"
-	"github.com/sapcc/vpa_butler/internal/controllers"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -34,6 +32,9 @@ import (
 	vpav1 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1"
 	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/sapcc/vpa_butler/internal/common"
+	"github.com/sapcc/vpa_butler/internal/controllers"
 )
 
 var _ = Describe("VpaController", func() {

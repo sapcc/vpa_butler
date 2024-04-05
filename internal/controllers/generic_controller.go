@@ -21,7 +21,6 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
-	"github.com/sapcc/vpa_butler/internal/common"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -31,6 +30,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+
+	"github.com/sapcc/vpa_butler/internal/common"
 )
 
 const (
