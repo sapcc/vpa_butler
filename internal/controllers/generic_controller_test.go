@@ -16,7 +16,7 @@ package controllers_test
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -27,7 +27,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	kerorrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	vpav1 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1"
@@ -67,24 +67,24 @@ func expectVpa(name string) {
 		}
 		mangedBy, ok := vpa.Annotations[common.AnnotationManagedBy]
 		if !ok {
-			return fmt.Errorf("vpa does not have managed-by annotation")
+			return errors.New("vpa does not have managed-by annotation")
 		}
 		if mangedBy != common.AnnotationVpaButler {
-			return fmt.Errorf("vpa has wrong managed-by annotation")
+			return errors.New("vpa has wrong managed-by annotation")
 		}
 		// the min resources stuff technically belongs to vpa_controller.go
 		if vpa.Spec.ResourcePolicy == nil {
-			return fmt.Errorf("vpa resource policy is nil")
+			return errors.New("vpa resource policy is nil")
 		}
 		if len(vpa.Spec.ResourcePolicy.ContainerPolicies) != 1 {
-			return fmt.Errorf("vpa has wrong amount of container policies")
+			return errors.New("vpa has wrong amount of container policies")
 		}
 		minAllowed := vpa.Spec.ResourcePolicy.ContainerPolicies[0].MinAllowed
 		if !minAllowed.Cpu().Equal(testMinAllowedCPU) {
-			return fmt.Errorf("vpa minAllowed CPU does not match")
+			return errors.New("vpa minAllowed CPU does not match")
 		}
 		if !minAllowed.Memory().Equal(testMinAllowedMemory) {
-			return fmt.Errorf("vpa minAllowed memory does not match")
+			return errors.New("vpa minAllowed memory does not match")
 		}
 		return nil
 	}).Should(Succeed())
@@ -95,7 +95,7 @@ func deleteVpa(name string) {
 	vpa.Name = name
 	vpa.Namespace = metav1.NamespaceDefault
 	err := k8sClient.Delete(context.Background(), &vpa)
-	if errors.IsNotFound(err) {
+	if kerorrs.IsNotFound(err) {
 		return
 	}
 	Expect(err).To(Succeed())
@@ -241,7 +241,7 @@ var _ = Describe("GenericController", func() {
 				}, &vpa)
 				g.Expect(err).To(HaveOccurred())
 				return err
-			}).Should(Satisfy(errors.IsNotFound))
+			}).Should(Satisfy(kerorrs.IsNotFound))
 		})
 
 	})
@@ -288,7 +288,7 @@ var _ = Describe("GenericController", func() {
 				}, &vpa)
 				g.Expect(err).To(HaveOccurred())
 				return err
-			}).Should(Satisfy(errors.IsNotFound))
+			}).Should(Satisfy(kerorrs.IsNotFound))
 		})
 	})
 

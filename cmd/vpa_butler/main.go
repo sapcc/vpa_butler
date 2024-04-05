@@ -61,16 +61,16 @@ var (
 )
 
 func init() {
-	_ = autoscaling.AddToScheme(scheme)
-	_ = clientgoscheme.AddToScheme(scheme)
+	_ = autoscaling.AddToScheme(scheme)    //nolint:errcheck //application fails immediately if schemes are not found
+	_ = clientgoscheme.AddToScheme(scheme) //nolint:errcheck //application fails immediately if schemes are not found
 
 	flag.StringVar(&defaultVpaUpdateMode, "default-vpa-update-mode", "Off",
-		fmt.Sprintf("The default update mode for the vpa instances. Must be one of: %s",
-			strings.Join(common.SupportedUpdatedModes, ",")))
+		"The default update mode for the vpa instances. Must be one of: "+
+			strings.Join(common.SupportedUpdatedModes, ","))
 
 	flag.StringVar(&defaultVpaSupportedValues, "default-vpa-supported-values", "RequestsOnly",
-		fmt.Sprintf("Controls which resource value should be autoscaled. Must be one of: %s",
-			strings.Join(common.SupportedControlledValues, ",")))
+		"Controls which resource value should be autoscaled. Must be one of: "+
+			strings.Join(common.SupportedControlledValues, ","))
 
 	flag.StringVar(&defaultMinAllowedMemory, "default-min-allowed-memory", "48Mi",
 		"The default min allowed memory per container that the vpa can set")

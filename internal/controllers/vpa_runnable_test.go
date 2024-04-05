@@ -16,7 +16,7 @@ package controllers_test
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -52,23 +52,23 @@ func expectMaxResources(name, cpu, mem string) {
 		}
 		mangedBy, ok := vpa.Annotations[common.AnnotationManagedBy]
 		if !ok {
-			return fmt.Errorf("vpa does not have managed-by annotation")
+			return errors.New("vpa does not have managed-by annotation")
 		}
 		if mangedBy != common.AnnotationVpaButler {
-			return fmt.Errorf("vpa has wrong managed-by annotation")
+			return errors.New("vpa has wrong managed-by annotation")
 		}
 		if vpa.Spec.ResourcePolicy == nil {
-			return fmt.Errorf("vpa resource policy is nil")
+			return errors.New("vpa resource policy is nil")
 		}
 		if len(vpa.Spec.ResourcePolicy.ContainerPolicies) != 1 {
-			return fmt.Errorf("vpa has wrong amount of container policies")
+			return errors.New("vpa has wrong amount of container policies")
 		}
 		maxAllowed := vpa.Spec.ResourcePolicy.ContainerPolicies[0].MaxAllowed
 		if !maxAllowed.Cpu().Equal(resource.MustParse(cpu)) {
-			return fmt.Errorf("vpa maxAllowed CPU does not match")
+			return errors.New("vpa maxAllowed CPU does not match")
 		}
 		if !maxAllowed.Memory().Equal(resource.MustParse(mem)) {
-			return fmt.Errorf("vpa maxAllowed memory does not match")
+			return errors.New("vpa maxAllowed memory does not match")
 		}
 		return nil
 	}).Should(Succeed())
@@ -85,7 +85,7 @@ var _ = Describe("VpaRunnable", func() {
 			corev1.ResourceCPU:    resource.MustParse("1"),
 			corev1.ResourceMemory: resource.MustParse("2000"),
 		}
-		Expect(k8sClient.Create(context.Background(), node))
+		Expect(k8sClient.Create(context.Background(), node)).To(Succeed())
 	})
 
 	When("a deployment is created", func() {
@@ -102,7 +102,7 @@ var _ = Describe("VpaRunnable", func() {
 
 		AfterEach(func() {
 			deleteVpa(deployVpaName)
-			Expect(k8sClient.Delete(context.Background(), deployment))
+			Expect(k8sClient.Delete(context.Background(), deployment)).To(Succeed())
 		})
 
 	})
@@ -121,7 +121,7 @@ var _ = Describe("VpaRunnable", func() {
 
 		AfterEach(func() {
 			deleteVpa(statefulSetName + "-statefulset")
-			Expect(k8sClient.Delete(context.Background(), statefulset))
+			Expect(k8sClient.Delete(context.Background(), statefulset)).To(Succeed())
 		})
 	})
 
@@ -139,7 +139,7 @@ var _ = Describe("VpaRunnable", func() {
 
 		AfterEach(func() {
 			deleteVpa(daemonSetName + "-daemonset")
-			Expect(k8sClient.Delete(context.Background(), daemonset))
+			Expect(k8sClient.Delete(context.Background(), daemonset)).To(Succeed())
 		})
 
 	})
@@ -208,7 +208,7 @@ var _ = Describe("VpaRunnable", func() {
 				corev1.ResourceCPU:    resource.MustParse("4000m"),
 				corev1.ResourceMemory: resource.MustParse("500"),
 			}
-			Expect(k8sClient.Create(context.Background(), secondNode))
+			Expect(k8sClient.Create(context.Background(), secondNode)).To(Succeed())
 			deployment = makeDeployment()
 			Expect(k8sClient.Create(context.Background(), deployment)).To(Succeed())
 			daemonSet = makeDaemonSet()
@@ -218,9 +218,9 @@ var _ = Describe("VpaRunnable", func() {
 		AfterEach(func() {
 			deleteVpa("test-daemonset-daemonset")
 			deleteVpa(deployVpaName)
-			Expect(k8sClient.Delete(context.Background(), daemonSet))
-			Expect(k8sClient.Delete(context.Background(), deployment))
-			Expect(k8sClient.Delete(context.Background(), secondNode))
+			Expect(k8sClient.Delete(context.Background(), daemonSet)).To(Succeed())
+			Expect(k8sClient.Delete(context.Background(), deployment)).To(Succeed())
+			Expect(k8sClient.Delete(context.Background(), secondNode)).To(Succeed())
 		})
 
 		It("prefers the node with the most memory for setting maximum allowed resources for non-daemonsets", func() {
@@ -276,12 +276,12 @@ var _ = Describe("VpaRunnable", func() {
 
 		AfterEach(func() {
 			deleteVpa(deployVpaName)
-			Expect(k8sClient.Delete(context.Background(), deployment))
+			Expect(k8sClient.Delete(context.Background(), deployment)).To(Succeed())
 		})
 	})
 
 	AfterEach(func() {
-		Expect(k8sClient.Delete(context.Background(), node))
+		Expect(k8sClient.Delete(context.Background(), node)).To(Succeed())
 	})
 
 })

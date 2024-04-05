@@ -16,6 +16,7 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -50,7 +51,7 @@ type GenericController struct {
 
 func (v *GenericController) SetupWithManager(mgr ctrl.Manager, instance client.Object) error {
 	v.typeName = strings.ToLower(reflect.TypeOf(instance).Elem().Name())
-	name := fmt.Sprintf("%s-controller", v.typeName)
+	name := v.typeName + "-controller"
 	v.Client = mgr.GetClient()
 	v.Log = mgr.GetLogger().WithName(name)
 	v.Scheme = mgr.GetScheme()
@@ -65,7 +66,7 @@ func (v *GenericController) SetupWithManager(mgr ctrl.Manager, instance client.O
 func (v *GenericController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	instance, ok := v.instance.DeepCopyObject().(client.Object)
 	if !ok {
-		return ctrl.Result{}, fmt.Errorf("failed to cast instance to client.Object")
+		return ctrl.Result{}, errors.New("failed to cast instance to client.Object")
 	}
 	if err := v.Get(ctx, req.NamespacedName, instance); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)

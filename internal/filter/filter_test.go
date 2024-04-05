@@ -29,7 +29,7 @@ var _ = Describe("Schedulable", func() {
 	It("removes nodes that are unschedulable", func() {
 		var node corev1.Node
 		node.Spec.Unschedulable = true
-		Expect(filter.Schedulable([]corev1.Node{node})).To(HaveLen(0))
+		Expect(filter.Schedulable([]corev1.Node{node})).To(BeEmpty())
 	})
 
 	It("keeps nodes that are schedulable", func() {
@@ -48,7 +48,7 @@ var _ = Describe("NodeName", func() {
 
 	It("returns zero nodes if no name matches", func() {
 		target := filter.TargetedVpa{PodSpec: corev1.PodSpec{NodeName: "brr"}}
-		Expect(filter.NodeName(target, []corev1.Node{{}})).To(HaveLen(0))
+		Expect(filter.NodeName(target, []corev1.Node{{}})).To(BeEmpty())
 	})
 
 	It("only keeps the node with the matching name", func() {
@@ -80,7 +80,7 @@ var _ = Describe("TaintToleration", func() {
 					Effect: corev1.TaintEffectNoExecute,
 				}},
 			},
-		}})).To(HaveLen(0))
+		}})).To(BeEmpty())
 	})
 
 	It("keeps nodes if they are tainted but pods have a matching toleration", func() {
@@ -131,7 +131,7 @@ var _ = Describe("NodeAffinity", func() {
 	It("filters node if an affinity does not match", func() {
 		Expect(filter.NodeAffinity(filter.TargetedVpa{PodSpec: corev1.PodSpec{
 			Affinity: affinity,
-		}}, []corev1.Node{{}})).To(HaveLen(0))
+		}}, []corev1.Node{{}})).To(BeEmpty())
 	})
 
 	It("keeps nodes if an affinity matches", func() {

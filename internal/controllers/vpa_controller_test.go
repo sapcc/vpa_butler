@@ -70,7 +70,7 @@ var _ = Describe("VpaController", func() {
 			Expect(k8sClient.Delete(context.Background(), deployment)).To(Succeed())
 		})
 
-		It("should delete the served vpa for apps/v1", func() {
+		It("should delete the served vpa for apps/v1", func() { //nolint:dupl //it's just a test
 			vpa = &vpav1.VerticalPodAutoscaler{}
 			vpa.Name = deploymentCustomVpaName
 			vpa.Namespace = metav1.NamespaceDefault
@@ -90,7 +90,7 @@ var _ = Describe("VpaController", func() {
 			}).ShouldNot(Succeed())
 		})
 
-		It("should delete the served vpa for v1", func() {
+		It("should delete the served vpa for v1", func() { //nolint:dupl //it's just a test
 			vpa = &vpav1.VerticalPodAutoscaler{}
 			vpa.Name = deploymentCustomVpaName
 			vpa.Namespace = metav1.NamespaceDefault
@@ -156,7 +156,7 @@ var _ = Describe("VpaController", func() {
 
 		AfterEach(func() {
 			// failsafe: there is a deletion in the tests, so we drop the error here
-			_ = k8sClient.Delete(context.Background(), deployment)
+			_ = k8sClient.Delete(context.Background(), deployment) //nolint:errcheck // see above comment
 			deleteVpa("test-deployment-deployment")
 			common.VpaUpdateMode = defaultUpdateMode
 		})
