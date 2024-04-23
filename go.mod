@@ -10,7 +10,7 @@ require (
 	github.com/prometheus/client_golang v1.19.0
 	k8s.io/api v0.29.3
 	k8s.io/apimachinery v0.29.3
-	k8s.io/autoscaler/vertical-pod-autoscaler v1.0.0
+	k8s.io/autoscaler/vertical-pod-autoscaler v1.1.0
 	k8s.io/client-go v0.29.3
 	k8s.io/component-helpers v0.29.3
 	k8s.io/utils v0.0.0-20240310230437-4693a0247e57
@@ -56,7 +56,7 @@ require (
 	golang.org/x/sys v0.19.0 // indirect
 	golang.org/x/term v0.19.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
-	golang.org/x/time v0.3.0 // indirect
+	golang.org/x/time v0.4.0 // indirect
 	golang.org/x/tools v0.17.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
