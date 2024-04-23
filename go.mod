@@ -8,11 +8,11 @@ require (
 	github.com/onsi/gomega v1.33.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.19.0
-	k8s.io/api v0.29.3
-	k8s.io/apimachinery v0.29.3
+	k8s.io/api v0.29.4
+	k8s.io/apimachinery v0.29.4
 	k8s.io/autoscaler/vertical-pod-autoscaler v1.1.0
-	k8s.io/client-go v0.29.3
-	k8s.io/component-helpers v0.29.3
+	k8s.io/client-go v0.29.4
+	k8s.io/component-helpers v0.29.4
 	k8s.io/utils v0.0.0-20240310230437-4693a0247e57
 	sigs.k8s.io/controller-runtime v0.17.3
 )
