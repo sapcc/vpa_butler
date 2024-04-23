@@ -285,7 +285,6 @@ func (v *VpaController) configureVpa(vpaOwner replicatedObject, vpa *vpav1.Verti
 	vpa.Spec.UpdatePolicy.MinReplicas = nil
 	if vpa.Spec.UpdatePolicy.UpdateMode != nil {
 		autoModes := []vpav1.UpdateMode{vpav1.UpdateModeAuto, vpav1.UpdateModeRecreate}
-		v.Log.Info("replica check", "updateMode", vpa.Spec.UpdatePolicy.UpdateMode, "replicas", vpaOwner.replicas)
 		if slices.Contains(autoModes, *vpa.Spec.UpdatePolicy.UpdateMode) {
 			if vpaOwner.replicas != nil && *vpaOwner.replicas <= 1 {
 				vpa.Spec.UpdatePolicy.MinReplicas = ptr.To(int32(1))
