@@ -33,6 +33,7 @@ var (
 		string(vpav1.UpdateModeOff),
 		string(vpav1.UpdateModeInitial),
 		string(vpav1.UpdateModeRecreate),
+		string(vpav1.UpdateModeAuto),
 	}
 	SupportedControlledValues = []string{
 		string(vpav1.ContainerControlledValuesRequestsOnly),

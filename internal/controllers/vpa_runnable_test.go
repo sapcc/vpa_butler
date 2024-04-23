@@ -92,7 +92,7 @@ var _ = Describe("VpaRunnable", func() {
 		var deployment *appsv1.Deployment
 
 		BeforeEach(func() {
-			deployment = makeDeployment()
+			deployment = makeDeployment(1)
 			Expect(k8sClient.Create(context.Background(), deployment)).To(Succeed())
 		})
 
@@ -169,7 +169,7 @@ var _ = Describe("VpaRunnable", func() {
 				},
 			}
 			Expect(k8sClient.Create(context.Background(), vpa)).To(Succeed())
-			deployment = makeDeployment()
+			deployment = makeDeployment(1)
 			Expect(k8sClient.Create(context.Background(), deployment)).To(Succeed())
 		})
 
@@ -209,7 +209,7 @@ var _ = Describe("VpaRunnable", func() {
 				corev1.ResourceMemory: resource.MustParse("500"),
 			}
 			Expect(k8sClient.Create(context.Background(), secondNode)).To(Succeed())
-			deployment = makeDeployment()
+			deployment = makeDeployment(1)
 			Expect(k8sClient.Create(context.Background(), deployment)).To(Succeed())
 			daemonSet = makeDaemonSet()
 			Expect(k8sClient.Create(context.Background(), daemonSet)).To(Succeed())
@@ -236,7 +236,7 @@ var _ = Describe("VpaRunnable", func() {
 		var deployment *appsv1.Deployment
 
 		BeforeEach(func() {
-			deployment = makeDeployment()
+			deployment = makeDeployment(1)
 			containers := deployment.Spec.Template.Spec.Containers
 			next := containers[0].DeepCopy()
 			next.Name = "next"

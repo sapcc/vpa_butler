@@ -101,13 +101,13 @@ func deleteVpa(name string) {
 	Expect(err).To(Succeed())
 }
 
-func makeDeployment() *appsv1.Deployment {
+func makeDeployment(replicas int32) *appsv1.Deployment {
 	deployment := &appsv1.Deployment{}
 	deployment.Name = deploymentName
 	deployment.Namespace = metav1.NamespaceDefault
 	deployment.Spec.Selector = &selector
 	deployment.Spec.Template.ObjectMeta.Labels = labels
-	deployment.Spec.Replicas = ptr.To[int32](1)
+	deployment.Spec.Replicas = &replicas
 	deployment.Spec.Template.Spec.Containers = containers
 	deployment.Spec.Template.Spec.Tolerations = []corev1.Toleration{{
 		Key:      corev1.TaintNodeNotReady,
@@ -150,13 +150,13 @@ func makeDaemonSet() *appsv1.DaemonSet {
 
 var _ = Describe("GenericController", func() {
 
-	Context("when creating a deployment", func() {
+	Context("when creating a deployment with a single replica", func() {
 		var deployment *appsv1.Deployment
 		var defaultUpdateMode vpav1.UpdateMode
 
 		BeforeEach(func() {
 			defaultUpdateMode = common.VpaUpdateMode
-			deployment = makeDeployment()
+			deployment = makeDeployment(1)
 			Expect(k8sClient.Create(context.Background(), deployment)).To(Succeed())
 		})
 
@@ -167,7 +167,49 @@ var _ = Describe("GenericController", func() {
 		})
 
 		It("should create a vpa", func() {
-			expectVpa("test-deployment-deployment")
+			name := "test-deployment-deployment"
+			expectVpa(name)
+			ref := types.NamespacedName{Name: name, Namespace: metav1.NamespaceDefault}
+			var vpa vpav1.VerticalPodAutoscaler
+			Expect(k8sClient.Get(context.Background(), ref, &vpa)).To(Succeed())
+			Expect(vpa.Spec.UpdatePolicy.MinReplicas).To(BeNil())
+		})
+
+		It("should set minreplicas in recreate mode", func() {
+			common.VpaUpdateMode = vpav1.UpdateModeRecreate
+			name := "test-deployment-deployment"
+			expectVpa(name)
+			ref := types.NamespacedName{Name: name, Namespace: metav1.NamespaceDefault}
+			var vpa vpav1.VerticalPodAutoscaler
+			Expect(k8sClient.Get(context.Background(), ref, &vpa)).To(Succeed())
+			Expect(vpa.Spec.UpdatePolicy.MinReplicas).To(Equal(ptr.To(int32(1))))
+		})
+	})
+
+	Context("when creating a deployment with two replicas", func() {
+		var deployment *appsv1.Deployment
+		var defaultUpdateMode vpav1.UpdateMode
+
+		BeforeEach(func() {
+			defaultUpdateMode = common.VpaUpdateMode
+			deployment = makeDeployment(2)
+			Expect(k8sClient.Create(context.Background(), deployment)).To(Succeed())
+		})
+
+		AfterEach(func() {
+			deleteVpa("test-deployment-deployment")
+			Expect(k8sClient.Delete(context.Background(), deployment)).To(Succeed())
+			common.VpaUpdateMode = defaultUpdateMode
+		})
+
+		It("should not set minreplicas in recreate mode", func() {
+			common.VpaUpdateMode = vpav1.UpdateModeRecreate
+			name := "test-deployment-deployment"
+			expectVpa(name)
+			ref := types.NamespacedName{Name: name, Namespace: metav1.NamespaceDefault}
+			var vpa vpav1.VerticalPodAutoscaler
+			Expect(k8sClient.Get(context.Background(), ref, &vpa)).To(Succeed())
+			Expect(vpa.Spec.UpdatePolicy.MinReplicas).To(BeNil())
 		})
 	})
 
@@ -221,7 +263,7 @@ var _ = Describe("GenericController", func() {
 				APIVersion: "apps/v1",
 			}
 			Expect(k8sClient.Create(context.Background(), vpa)).To(Succeed())
-			deployment = makeDeployment()
+			deployment = makeDeployment(1)
 			Expect(k8sClient.Create(context.Background(), deployment)).To(Succeed())
 		})
 
@@ -260,7 +302,7 @@ var _ = Describe("GenericController", func() {
 				APIVersion: "apps/v1",
 			}
 			Expect(k8sClient.Create(context.Background(), vpa)).To(Succeed())
-			deployment = makeDeployment()
+			deployment = makeDeployment(1)
 			deployment.OwnerReferences = []metav1.OwnerReference{
 				{
 					APIVersion: vpa.Spec.TargetRef.APIVersion,

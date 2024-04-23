@@ -17,6 +17,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/go-logr/logr"
@@ -31,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	vpav1 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1"
-	"k8s.io/utils/strings/slices"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -82,7 +83,7 @@ func (v *VpaController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	deleted, err = v.cleanupServedVpa(ctx, cleanupParams{vpa: vpa, target: target})
+	deleted, err = v.cleanupServedVpa(ctx, cleanupParams{vpa: vpa, target: target.object})
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -96,10 +97,15 @@ func (v *VpaController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	return ctrl.Result{}, v.reconcileVpa(ctx, target)
 }
 
+type replicatedObject struct {
+	object   client.Object
+	replicas *int32
+}
+
 // Returns nil and no error, if the target kind is not considered by the vpa_butler.
-func (v *VpaController) extractTarget(ctx context.Context, vpa *vpav1.VerticalPodAutoscaler) (client.Object, error) {
+func (v *VpaController) extractTarget(ctx context.Context, vpa *vpav1.VerticalPodAutoscaler) (replicatedObject, error) {
 	if vpa.Spec.TargetRef == nil {
-		return nil, fmt.Errorf("vpa %s/%s has nil target ref", vpa.Namespace, vpa.Name)
+		return replicatedObject{}, fmt.Errorf("vpa %s/%s has nil target ref", vpa.Namespace, vpa.Name)
 	}
 	ref := *vpa.Spec.TargetRef
 	switch ref.Kind {
@@ -107,29 +113,29 @@ func (v *VpaController) extractTarget(ctx context.Context, vpa *vpav1.VerticalPo
 		var deployment appsv1.Deployment
 		err := v.Client.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: vpa.Namespace}, &deployment)
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetch target %s/%s of kind %s for vpa",
+			return replicatedObject{}, fmt.Errorf("failed to fetch target %s/%s of kind %s for vpa",
 				vpa.Namespace, ref.Name, ref.Kind)
 		}
-		return &deployment, nil
+		return replicatedObject{object: &deployment, replicas: deployment.Spec.Replicas}, nil
 	case StatefulSetStr:
 		var sts appsv1.StatefulSet
 		err := v.Client.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: vpa.Namespace}, &sts)
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetch target %s/%s of kind %s for vpa",
+			return replicatedObject{}, fmt.Errorf("failed to fetch target %s/%s of kind %s for vpa",
 				vpa.Namespace, ref.Name, ref.Kind)
 		}
-		return &sts, nil
+		return replicatedObject{object: &sts, replicas: sts.Spec.Replicas}, nil
 	case DaemonSetStr:
 		var ds appsv1.DaemonSet
 		err := v.Client.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: vpa.Namespace}, &ds)
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetch target %s/%s of kind %s for vpa",
+			return replicatedObject{}, fmt.Errorf("failed to fetch target %s/%s of kind %s for vpa",
 				vpa.Namespace, ref.Name, ref.Kind)
 		}
-		return &ds, nil
+		return replicatedObject{object: &ds}, nil
 	}
 	v.Log.Info("unknown target kind", "kind", ref.Kind, "name", vpa.Name, "namespace", vpa.Namespace)
-	return nil, nil
+	return replicatedObject{}, nil
 }
 
 type cleanupParams struct {
@@ -224,10 +230,10 @@ func (v *VpaController) deleteOrphanedVpa(ctx context.Context, vpa *vpav1.Vertic
 	return false, err
 }
 
-func (v *VpaController) reconcileVpa(ctx context.Context, vpaOwner client.Object) error {
+func (v *VpaController) reconcileVpa(ctx context.Context, vpaOwner replicatedObject) error {
 	var vpa = new(vpav1.VerticalPodAutoscaler)
-	vpa.Namespace = vpaOwner.GetNamespace()
-	vpa.Name = getVpaName(vpaOwner)
+	vpa.Namespace = vpaOwner.object.GetNamespace()
+	vpa.Name = getVpaName(vpaOwner.object)
 	exists := true
 	if err := v.Client.Get(ctx, client.ObjectKeyFromObject(vpa), vpa); err != nil {
 		// Return any other error.
@@ -265,14 +271,25 @@ func (v *VpaController) reconcileVpa(ctx context.Context, vpaOwner client.Object
 	return nil
 }
 
-func (v *VpaController) configureVpa(vpaOwner client.Object, vpa *vpav1.VerticalPodAutoscaler) error {
-	common.ConfigureVpaBaseline(vpa, vpaOwner, common.VpaUpdateMode)
-	annotations := vpaOwner.GetAnnotations()
+func (v *VpaController) configureVpa(vpaOwner replicatedObject, vpa *vpav1.VerticalPodAutoscaler) error {
+	common.ConfigureVpaBaseline(vpa, vpaOwner.object, common.VpaUpdateMode)
+	annotations := vpaOwner.object.GetAnnotations()
 
 	if updateModeStr, ok := annotations[UpdateModeAnnotationKey]; ok {
 		if slices.Contains(common.SupportedUpdatedModes, updateModeStr) {
 			updateMode := vpav1.UpdateMode(updateModeStr)
 			vpa.Spec.UpdatePolicy.UpdateMode = &updateMode
+		}
+	}
+
+	vpa.Spec.UpdatePolicy.MinReplicas = nil
+	if vpa.Spec.UpdatePolicy.UpdateMode != nil {
+		autoModes := []vpav1.UpdateMode{vpav1.UpdateModeAuto, vpav1.UpdateModeRecreate}
+		v.Log.Info("replica check", "updateMode", vpa.Spec.UpdatePolicy.UpdateMode, "replicas", vpaOwner.replicas)
+		if slices.Contains(autoModes, *vpa.Spec.UpdatePolicy.UpdateMode) {
+			if vpaOwner.replicas != nil && *vpaOwner.replicas <= 1 {
+				vpa.Spec.UpdatePolicy.MinReplicas = ptr.To(int32(1))
+			}
 		}
 	}
 
@@ -310,7 +327,7 @@ func (v *VpaController) configureVpa(vpaOwner client.Object, vpa *vpav1.Vertical
 	}
 	vpa.Annotations[annotationVpaButlerVersion] = v.Version
 
-	return controllerutil.SetOwnerReference(vpaOwner, vpa, v.Scheme)
+	return controllerutil.SetOwnerReference(vpaOwner.object, vpa, v.Scheme)
 }
 
 func isNewNamingSchema(name string) bool {

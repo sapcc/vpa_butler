@@ -60,7 +60,7 @@ var _ = Describe("VpaController", func() {
 		var vpa *vpav1.VerticalPodAutoscaler
 
 		BeforeEach(func() {
-			deployment = makeDeployment()
+			deployment = makeDeployment(1)
 			Expect(k8sClient.Create(context.Background(), deployment)).To(Succeed())
 		})
 
@@ -150,7 +150,7 @@ var _ = Describe("VpaController", func() {
 
 		BeforeEach(func() {
 			defaultUpdateMode = common.VpaUpdateMode
-			deployment = makeDeployment()
+			deployment = makeDeployment(1)
 			Expect(k8sClient.Create(context.Background(), deployment)).To(Succeed())
 		})
 
