@@ -9,8 +9,7 @@ binaries:
     installTo:   bin/
 
 golang:
-  # disabled due to go mod tidy changing it to 1.22.0
-  # setGoModVersion: true
+  setGoModVersion: true
 
 golangciLint:
   createConfig: true
