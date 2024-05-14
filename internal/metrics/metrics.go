@@ -46,11 +46,11 @@ func RecordContainerRecommendationExcess(vpa *vpav1.VerticalPodAutoscaler) {
 	for i := range vpa.Status.Recommendation.ContainerRecommendations {
 		recommendation := vpa.Status.Recommendation.ContainerRecommendations[i]
 		var maxRecommendation corev1.ResourceList
-		if max, ok := maxAllowed["*"]; ok {
-			maxRecommendation = max
+		if allowed, ok := maxAllowed["*"]; ok {
+			maxRecommendation = allowed
 		}
-		if max, ok := maxAllowed[recommendation.ContainerName]; ok {
-			maxRecommendation = max
+		if allowed, ok := maxAllowed[recommendation.ContainerName]; ok {
+			maxRecommendation = allowed
 		}
 		if maxRecommendation == nil {
 			continue
