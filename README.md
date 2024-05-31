@@ -1,5 +1,5 @@
 # vpa_butler
-![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/sapcc/vpa_butler/test.yaml?branch=main)
+![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/sapcc/vpa_butler/ci.yaml?branch=main)
 [![Coverage Status](https://coveralls.io/repos/github/sapcc/vpa_butler/badge.svg)](https://coveralls.io/github/sapcc/vpa_butler)
 
 A Kubernetes controller designed to simplify the process of deploying and managing [VerticalPodAutoscalers](https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler) (VPAs) for deployments, statefulsets, and daemonsets.
