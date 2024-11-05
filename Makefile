@@ -35,7 +35,6 @@ GO_BUILDFLAGS =
 GO_LDFLAGS =
 GO_TESTENV =
 GO_BUILDENV =
-TESTBIN=$(shell pwd)/testbin
 
 build-all: build/vpa_butler
 
@@ -79,7 +78,7 @@ run-golangci-lint: FORCE prepare-static-check
 
 build/cover.out: FORCE install-ginkgo generate install-setup-envtest | build
 	@printf "\e[1;36m>> Running tests\e[0m\n"
-	KUBEBUILDER_ASSETS=$$(setup-envtest use 1.31 --bin-dir $(TESTBIN) -p path) ginkgo run --randomize-all -output-dir=build $(GO_BUILDFLAGS) -ldflags '-s -w $(GO_LDFLAGS)' -covermode=count -coverpkg=$(subst $(space),$(comma),$(GO_COVERPKGS)) $(GO_TESTPKGS)
+	KUBEBUILDER_ASSETS=$$(setup-envtest use 1.31 -p path) ginkgo run --randomize-all -output-dir=build $(GO_BUILDFLAGS) -ldflags '-s -w $(GO_LDFLAGS)' -covermode=count -coverpkg=$(subst $(space),$(comma),$(GO_COVERPKGS)) $(GO_TESTPKGS)
 	@mv build/coverprofile.out build/cover.out
 
 build/cover.html: build/cover.out
@@ -118,7 +117,6 @@ vars: FORCE
 	@printf "GO_LDFLAGS=$(GO_LDFLAGS)\n"
 	@printf "GO_TESTPKGS=$(GO_TESTPKGS)\n"
 	@printf "PREFIX=$(PREFIX)\n"
-	@printf "TESTBIN=$(TESTBIN)\n"
 help: FORCE
 	@printf "\n"
 	@printf "\e[1mUsage:\e[0m\n"
