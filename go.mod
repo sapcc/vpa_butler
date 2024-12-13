@@ -5,7 +5,7 @@ go 1.23
 require (
 	github.com/go-logr/logr v1.4.2
 	github.com/onsi/ginkgo/v2 v2.22.0
-	github.com/onsi/gomega v1.36.0
+	github.com/onsi/gomega v1.36.1
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.20.5
 	k8s.io/api v0.31.1
@@ -13,7 +13,7 @@ require (
 	k8s.io/autoscaler/vertical-pod-autoscaler v1.2.1
 	k8s.io/client-go v0.31.1
 	k8s.io/component-helpers v0.31.1
-	k8s.io/utils v0.0.0-20241104163129-6fe5fd82f078
+	k8s.io/utils v0.0.0-20241210054802-24370beab758
 	sigs.k8s.io/controller-runtime v0.19.3
 )
 
