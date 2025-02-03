@@ -48,7 +48,7 @@ GO_BUILDENV =
 build-all: build/vpa_butler
 
 build/vpa_butler: FORCE generate
-	@env $(GO_BUILDENV) go build $(GO_BUILDFLAGS) -ldflags '-s -w $(GO_LDFLAGS)' -o build/vpa_butler ./cmd/vpa_butler
+	env $(GO_BUILDENV) go build $(GO_BUILDFLAGS) -ldflags '-s -w $(GO_LDFLAGS)' -o build/vpa_butler ./cmd/vpa_butler
 
 DESTDIR =
 ifeq ($(shell uname -s),Darwin)
