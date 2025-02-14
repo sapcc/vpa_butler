@@ -1,6 +1,6 @@
 module github.com/sapcc/vpa_butler
 
-go 1.23.0
+go 1.24
 
 require (
 	github.com/go-logr/logr v1.4.2
