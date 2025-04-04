@@ -84,14 +84,14 @@ func (v *GenericController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	var vpa = new(vpav1.VerticalPodAutoscaler)
 	vpa.Namespace = instance.GetNamespace()
 	vpa.Name = getVpaName(instance)
-	if err := v.Client.Get(ctx, client.ObjectKeyFromObject(vpa), vpa); err != nil {
+	if err := v.Get(ctx, client.ObjectKeyFromObject(vpa), vpa); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return ctrl.Result{}, err
 		}
 		// vpa does not exist so create it
 		// set off here, as the vpa is to be fully configured by the VpaController
 		common.ConfigureVpaBaseline(vpa, instance, vpav1.UpdateModeOff)
-		return ctrl.Result{}, v.Client.Create(ctx, vpa)
+		return ctrl.Result{}, v.Create(ctx, vpa)
 	}
 	return ctrl.Result{}, nil
 }
@@ -112,7 +112,7 @@ func (v *GenericController) shouldServeVpa(ctx context.Context, vpaOwner client.
 	}
 
 	var vpas vpav1.VerticalPodAutoscalerList
-	err := v.Client.List(ctx, &vpas, client.InNamespace(vpaOwner.GetNamespace()))
+	err := v.List(ctx, &vpas, client.InNamespace(vpaOwner.GetNamespace()))
 	if err != nil {
 		return false, fmt.Errorf("failed to list vpas: %w", err)
 	}
@@ -139,14 +139,14 @@ func (v *GenericController) shouldServeVpa(ctx context.Context, vpaOwner client.
 func (v *GenericController) ensureVpaDeleted(ctx context.Context, vpaOwner client.Object) error {
 	var vpa vpav1.VerticalPodAutoscaler
 	ref := types.NamespacedName{Namespace: vpaOwner.GetNamespace(), Name: getVpaName(vpaOwner)}
-	err := v.Client.Get(ctx, ref, &vpa)
+	err := v.Get(ctx, ref, &vpa)
 	if apierrors.IsNotFound(err) {
 		return nil
 	} else if err != nil {
 		return err
 	}
 	v.Log.Info("Deleting vpa as a hand-crafted vpa is already in place", "namespace", vpa.Namespace, "name", vpa.Name)
-	return v.Client.Delete(ctx, &vpa)
+	return v.Delete(ctx, &vpa)
 }
 
 func getVpaName(vpaOwner client.Object) string {
