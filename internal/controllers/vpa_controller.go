@@ -68,7 +68,7 @@ func (v *VpaController) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func (v *VpaController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	v.Log.Info("Reconciling vpa", "namespace", req.NamespacedName.Namespace, "name", req.NamespacedName.Name)
+	v.Log.Info("Reconciling vpa", "namespace", req.Namespace, "name", req.Name)
 	var vpa = new(vpav1.VerticalPodAutoscaler)
 	if err := v.Get(ctx, req.NamespacedName, vpa); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
@@ -111,7 +111,7 @@ func (v *VpaController) extractTarget(ctx context.Context, vpa *vpav1.VerticalPo
 	switch ref.Kind {
 	case DeploymentStr:
 		var deployment appsv1.Deployment
-		err := v.Client.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: vpa.Namespace}, &deployment)
+		err := v.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: vpa.Namespace}, &deployment)
 		if err != nil {
 			return replicatedObject{}, fmt.Errorf("failed to fetch target %s/%s of kind %s for vpa",
 				vpa.Namespace, ref.Name, ref.Kind)
@@ -119,7 +119,7 @@ func (v *VpaController) extractTarget(ctx context.Context, vpa *vpav1.VerticalPo
 		return replicatedObject{object: &deployment, replicas: deployment.Spec.Replicas}, nil
 	case StatefulSetStr:
 		var sts appsv1.StatefulSet
-		err := v.Client.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: vpa.Namespace}, &sts)
+		err := v.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: vpa.Namespace}, &sts)
 		if err != nil {
 			return replicatedObject{}, fmt.Errorf("failed to fetch target %s/%s of kind %s for vpa",
 				vpa.Namespace, ref.Name, ref.Kind)
@@ -127,7 +127,7 @@ func (v *VpaController) extractTarget(ctx context.Context, vpa *vpav1.VerticalPo
 		return replicatedObject{object: &sts, replicas: sts.Spec.Replicas}, nil
 	case DaemonSetStr:
 		var ds appsv1.DaemonSet
-		err := v.Client.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: vpa.Namespace}, &ds)
+		err := v.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: vpa.Namespace}, &ds)
 		if err != nil {
 			return replicatedObject{}, fmt.Errorf("failed to fetch target %s/%s of kind %s for vpa",
 				vpa.Namespace, ref.Name, ref.Kind)
@@ -235,7 +235,7 @@ func (v *VpaController) reconcileVpa(ctx context.Context, vpaOwner replicatedObj
 	vpa.Namespace = vpaOwner.object.GetNamespace()
 	vpa.Name = getVpaName(vpaOwner.object)
 	exists := true
-	if err := v.Client.Get(ctx, client.ObjectKeyFromObject(vpa), vpa); err != nil {
+	if err := v.Get(ctx, client.ObjectKeyFromObject(vpa), vpa); err != nil {
 		// Return any other error.
 		if !apierrors.IsNotFound(err) {
 			return err
@@ -257,7 +257,7 @@ func (v *VpaController) reconcileVpa(ctx context.Context, vpaOwner replicatedObj
 
 	if !exists {
 		v.Log.Info("Creating vpa", "name", vpa.Name, "namespace", vpa.Namespace)
-		return v.Client.Create(ctx, vpa)
+		return v.Create(ctx, vpa)
 	}
 
 	if equality.Semantic.DeepEqual(before, vpa) {
@@ -265,7 +265,7 @@ func (v *VpaController) reconcileVpa(ctx context.Context, vpaOwner replicatedObj
 	}
 	patch := client.MergeFrom(before)
 	v.Log.Info("Patching vpa", "name", vpa.Name, "namespace", vpa.Namespace)
-	if err := v.Client.Patch(ctx, vpa, patch); err != nil {
+	if err := v.Patch(ctx, vpa, patch); err != nil {
 		return err
 	}
 	return nil

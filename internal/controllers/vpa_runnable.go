@@ -52,13 +52,13 @@ func (v *VpaRunnable) Start(ctx context.Context) error {
 
 func (v *VpaRunnable) reconcile(ctx context.Context) {
 	var nodes corev1.NodeList
-	err := v.Client.List(ctx, &nodes)
+	err := v.List(ctx, &nodes)
 	if err != nil {
 		v.Log.Error(err, "failed to list nodes to determine maximum allowed resources")
 		return
 	}
 	var vpas vpav1.VerticalPodAutoscalerList
-	err = v.Client.List(ctx, &vpas)
+	err = v.List(ctx, &vpas)
 	if err != nil {
 		v.Log.Error(err, "failed to list vpas to determine maximum allowed resources")
 		return
@@ -89,7 +89,7 @@ func (v *VpaRunnable) extractTarget(ctx context.Context, vpa *vpav1.VerticalPodA
 	switch ref.Kind {
 	case DeploymentStr:
 		var deployment appsv1.Deployment
-		err := v.Client.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: vpa.Namespace}, &deployment)
+		err := v.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: vpa.Namespace}, &deployment)
 		if err != nil {
 			return filter.TargetedVpa{}, fmt.Errorf("failed to fetch target %s/%s of kind %s for vpa",
 				vpa.Namespace, ref.Name, ref.Kind)
@@ -103,7 +103,7 @@ func (v *VpaRunnable) extractTarget(ctx context.Context, vpa *vpav1.VerticalPodA
 		}, nil
 	case StatefulSetStr:
 		var sts appsv1.StatefulSet
-		err := v.Client.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: vpa.Namespace}, &sts)
+		err := v.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: vpa.Namespace}, &sts)
 		if err != nil {
 			return filter.TargetedVpa{}, fmt.Errorf("failed to fetch target %s/%s of kind %s for vpa",
 				vpa.Namespace, ref.Name, ref.Kind)
@@ -117,7 +117,7 @@ func (v *VpaRunnable) extractTarget(ctx context.Context, vpa *vpav1.VerticalPodA
 		}, nil
 	case DaemonSetStr:
 		var ds appsv1.DaemonSet
-		err := v.Client.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: vpa.Namespace}, &ds)
+		err := v.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: vpa.Namespace}, &ds)
 		if err != nil {
 			return filter.TargetedVpa{}, fmt.Errorf("failed to fetch target %s/%s of kind %s for vpa",
 				vpa.Namespace, ref.Name, ref.Kind)
@@ -201,7 +201,7 @@ func (v *VpaRunnable) patchMaxRessources(ctx context.Context, params patchParams
 		}
 	}
 	vpa.Spec.ResourcePolicy.ContainerPolicies = policies
-	return v.Client.Patch(ctx, vpa, client.MergeFrom(unmodified))
+	return v.Patch(ctx, vpa, client.MergeFrom(unmodified))
 }
 
 func maxByMemory(nodes []corev1.Node) corev1.Node {

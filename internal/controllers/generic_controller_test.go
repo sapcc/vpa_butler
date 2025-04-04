@@ -106,7 +106,7 @@ func makeDeployment(replicas int32) *appsv1.Deployment {
 	deployment.Name = deploymentName
 	deployment.Namespace = metav1.NamespaceDefault
 	deployment.Spec.Selector = &selector
-	deployment.Spec.Template.ObjectMeta.Labels = labels
+	deployment.Spec.Template.Labels = labels
 	deployment.Spec.Replicas = &replicas
 	deployment.Spec.Template.Spec.Containers = containers
 	deployment.Spec.Template.Spec.Tolerations = []corev1.Toleration{{
@@ -122,7 +122,7 @@ func makeStatefulSet() *appsv1.StatefulSet {
 	statefulset.Name = statefulSetName
 	statefulset.Namespace = metav1.NamespaceDefault
 	statefulset.Spec.Selector = &selector
-	statefulset.Spec.Template.ObjectMeta.Labels = labels
+	statefulset.Spec.Template.Labels = labels
 	statefulset.Spec.Replicas = ptr.To[int32](1)
 	statefulset.Spec.Template.Spec.Containers = containers
 	statefulset.Spec.Template.Spec.Tolerations = []corev1.Toleration{{
@@ -138,7 +138,7 @@ func makeDaemonSet() *appsv1.DaemonSet {
 	daemonset.Name = daemonSetName
 	daemonset.Namespace = metav1.NamespaceDefault
 	daemonset.Spec.Selector = &selector
-	daemonset.Spec.Template.ObjectMeta.Labels = labels
+	daemonset.Spec.Template.Labels = labels
 	daemonset.Spec.Template.Spec.Containers = containers
 	daemonset.Spec.Template.Spec.Tolerations = []corev1.Toleration{{
 		Key:      corev1.TaintNodeNotReady,
