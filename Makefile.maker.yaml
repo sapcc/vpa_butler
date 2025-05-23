@@ -26,6 +26,12 @@ renovate:
     - Nuckal777
     - SuperSandro2000
 
+reuse:
+  annotations:
+  - SPDX-FileCopyrightText: Copyright 2020 The Kubernetes Authors
+    SPDX-License-Identifier: Apache-2.0
+    paths: ["test/crds/*"]
+
 verbatim: |
   fly:
     fly -t ci1 set-pipeline -p secrets-injector -c ci/pipeline.yaml

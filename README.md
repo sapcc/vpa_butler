@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2025 SAP SE or an SAP affiliate company
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # vpa_butler
 ![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/sapcc/vpa_butler/ci.yaml?branch=main)
 [![Coverage Status](https://coveralls.io/repos/github/sapcc/vpa_butler/badge.svg)](https://coveralls.io/github/sapcc/vpa_butler)
