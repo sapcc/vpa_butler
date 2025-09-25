@@ -17,8 +17,16 @@ var (
 	}, []string{"namespace", "verticalpodautoscaler", "container", "resource", "unit"})
 )
 
+var (
+	containerMaxAllowed = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "vpa_butler_vpa_container_max_allowed",
+		Help: "Max allowed value per container",
+	}, []string{"namespace", "verticalpodautoscaler", "container", "resource", "unit"})
+)
+
 func RegisterMetrics() {
 	metrics.Registry.MustRegister(containerRecommendationExcess)
+	metrics.Registry.MustRegister(containerMaxAllowed)
 }
 
 func RecordContainerRecommendationExcess(vpa *vpav1.VerticalPodAutoscaler) {
@@ -44,6 +52,10 @@ func RecordContainerRecommendationExcess(vpa *vpav1.VerticalPodAutoscaler) {
 		if maxRecommendation == nil {
 			continue
 		}
+
+		maxCpu := maxRecommendation.Cpu()
+		maxMemory := maxRecommendation.Memory()
+
 		excess := substractResources(recommendation.UncappedTarget, maxRecommendation)
 		labels := prometheus.Labels{
 			"namespace":             vpa.Namespace,
@@ -54,11 +66,13 @@ func RecordContainerRecommendationExcess(vpa *vpav1.VerticalPodAutoscaler) {
 			labels["resource"] = "cpu"
 			labels["unit"] = "core"
 			containerRecommendationExcess.With(labels).Set(cpu.AsApproximateFloat64())
+			containerMaxAllowed.With(labels).Set(maxCpu.AsApproximateFloat64())
 		}
 		if memory := excess.Memory(); memory != nil {
 			labels["resource"] = "memory"
 			labels["unit"] = "byte"
 			containerRecommendationExcess.With(labels).Set(memory.AsApproximateFloat64())
+			containerMaxAllowed.With(labels).Set(maxMemory.AsApproximateFloat64())
 		}
 	}
 }
