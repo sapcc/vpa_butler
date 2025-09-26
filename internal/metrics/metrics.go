@@ -31,9 +31,8 @@ func RegisterMetrics() {
 }
 
 func RecordContainerVpaMetrics(vpa *vpav1.VerticalPodAutoscaler) {
-	// no policy => no maximum => no excess
-	// no recommendations => no excess
-	if vpa.Spec.ResourcePolicy == nil || vpa.Status.Recommendation == nil {
+	// no policy => no maximum => no excess/max allowed
+	if vpa.Spec.ResourcePolicy == nil {
 		return
 	}
 
@@ -49,6 +48,11 @@ func RecordContainerVpaMetrics(vpa *vpav1.VerticalPodAutoscaler) {
 
 		recordMetric(containerMaxAllowed, labels, policy.ContainerName, "cpu", "core", policy.MaxAllowed.Cpu())
 		recordMetric(containerMaxAllowed, labels, policy.ContainerName, "memory", "byte", policy.MaxAllowed.Memory())
+	}
+
+	// no recommendations => no excess
+	if vpa.Status.Recommendation == nil {
+		return
 	}
 
 	for i := range vpa.Status.Recommendation.ContainerRecommendations {

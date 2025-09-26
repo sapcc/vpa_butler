@@ -289,7 +289,7 @@ var _ = Describe("VpaController", func() {
 			Expect(k8sClient.Delete(context.Background(), vpa)).To(Succeed())
 		})
 
-		It("creates recommendation excess metrics", func() {
+		It("creates container vpa metrics", func() {
 			Eventually(func(g Gomega) []string {
 				res, err := http.Get("http://127.0.0.1:8080/metrics")
 				g.Expect(err).To(Succeed())
