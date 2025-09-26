@@ -82,12 +82,12 @@ func substractResources(minuend, subtrahend corev1.ResourceList) corev1.Resource
 	return result
 }
 
-func recordMetric(gv *prometheus.GaugeVec, baseLabels prometheus.Labels, containerName, resource, unit string, q *resource.Quantity) {
+func recordMetric(gv *prometheus.GaugeVec, baseLabels prometheus.Labels, containerName, resourceName, unit string, q *resource.Quantity) {
 	if q == nil {
 		return
 	}
 	baseLabels["container"] = containerName
-	baseLabels["resource"] = resource
+	baseLabels["resource"] = resourceName
 	baseLabels["unit"] = unit
 	gv.With(baseLabels).Set(q.AsApproximateFloat64())
 }
