@@ -67,7 +67,7 @@ func (v *VpaController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, err
 	}
 
-	metrics.RecordContainerRecommendationExcess(vpa)
+	metrics.RecordContainerVpaMetrics(vpa)
 	target, err := v.extractTarget(ctx, vpa)
 	if err != nil {
 		return ctrl.Result{}, err

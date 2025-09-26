@@ -6,6 +6,7 @@ package metrics
 import (
 	"github.com/prometheus/client_golang/prometheus"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	vpav1 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
@@ -29,17 +30,27 @@ func RegisterMetrics() {
 	metrics.Registry.MustRegister(containerMaxAllowed)
 }
 
-func RecordContainerRecommendationExcess(vpa *vpav1.VerticalPodAutoscaler) {
+func RecordContainerVpaMetrics(vpa *vpav1.VerticalPodAutoscaler) {
 	// no policy => no maximum => no excess
 	// no recommendations => no excess
 	if vpa.Spec.ResourcePolicy == nil || vpa.Status.Recommendation == nil {
 		return
 	}
+
+	labels := prometheus.Labels{
+		"namespace":             vpa.Namespace,
+		"verticalpodautoscaler": vpa.Name,
+	}
+
 	maxAllowed := make(map[string]corev1.ResourceList)
 	for i := range vpa.Spec.ResourcePolicy.ContainerPolicies {
 		policy := vpa.Spec.ResourcePolicy.ContainerPolicies[i]
 		maxAllowed[policy.ContainerName] = policy.MaxAllowed
+
+		recordMetric(containerMaxAllowed, labels, policy.ContainerName, "cpu", "core", policy.MaxAllowed.Cpu())
+		recordMetric(containerMaxAllowed, labels, policy.ContainerName, "memory", "byte", policy.MaxAllowed.Memory())
 	}
+
 	for i := range vpa.Status.Recommendation.ContainerRecommendations {
 		recommendation := vpa.Status.Recommendation.ContainerRecommendations[i]
 		var maxRecommendation corev1.ResourceList
@@ -53,27 +64,9 @@ func RecordContainerRecommendationExcess(vpa *vpav1.VerticalPodAutoscaler) {
 			continue
 		}
 
-		maxCpu := maxRecommendation.Cpu()
-		maxMemory := maxRecommendation.Memory()
-
 		excess := substractResources(recommendation.UncappedTarget, maxRecommendation)
-		labels := prometheus.Labels{
-			"namespace":             vpa.Namespace,
-			"verticalpodautoscaler": vpa.Name,
-			"container":             recommendation.ContainerName,
-		}
-		if cpu := excess.Cpu(); cpu != nil {
-			labels["resource"] = "cpu"
-			labels["unit"] = "core"
-			containerRecommendationExcess.With(labels).Set(cpu.AsApproximateFloat64())
-			containerMaxAllowed.With(labels).Set(maxCpu.AsApproximateFloat64())
-		}
-		if memory := excess.Memory(); memory != nil {
-			labels["resource"] = "memory"
-			labels["unit"] = "byte"
-			containerRecommendationExcess.With(labels).Set(memory.AsApproximateFloat64())
-			containerMaxAllowed.With(labels).Set(maxMemory.AsApproximateFloat64())
-		}
+		recordMetric(containerRecommendationExcess, labels, recommendation.ContainerName, "cpu", "core", excess.Cpu())
+		recordMetric(containerRecommendationExcess, labels, recommendation.ContainerName, "memory", "byte", excess.Memory())
 	}
 }
 
@@ -87,4 +80,14 @@ func substractResources(minuend, subtrahend corev1.ResourceList) corev1.Resource
 		}
 	}
 	return result
+}
+
+func recordMetric(gv *prometheus.GaugeVec, baseLabels prometheus.Labels, containerName, resource, unit string, q *resource.Quantity) {
+	if q == nil {
+		return
+	}
+	baseLabels["container"] = containerName
+	baseLabels["resource"] = resource
+	baseLabels["unit"] = unit
+	gv.With(baseLabels).Set(q.AsApproximateFloat64())
 }
