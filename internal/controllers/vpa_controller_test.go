@@ -298,12 +298,17 @@ var _ = Describe("VpaController", func() {
 				Expect(err).To(Succeed())
 				lines := strings.Split(string(data), "\n")
 				excess := slices.Filter(nil, lines, func(s string) bool {
-					return strings.Contains(s, "vpa_butler_vpa_container_recommendation_excess{")
+					return strings.Contains(s, "vpa_butler_vpa_container_recommendation_excess{") ||
+						strings.Contains(s, "vpa_butler_vpa_container_max_allowed{")
 				})
 				return excess
 			}).Should(SatisfyAll(
+				// recommendation excess
 				ContainElement("vpa_butler_vpa_container_recommendation_excess{container=\"the-container\",namespace=\"default\",resource=\"cpu\",unit=\"core\",verticalpodautoscaler=\"metrics\"} -0.5"),               //nolint:lll
 				ContainElement("vpa_butler_vpa_container_recommendation_excess{container=\"the-container\",namespace=\"default\",resource=\"memory\",unit=\"byte\",verticalpodautoscaler=\"metrics\"} 2.147483648e+09"), //nolint:lll
+				// max allowed
+				ContainElement("vpa_butler_vpa_container_max_allowed{container=\"*\",namespace=\"default\",resource=\"cpu\",unit=\"core\",verticalpodautoscaler=\"metrics\"} 1"),                  //nolint:lll
+				ContainElement("vpa_butler_vpa_container_max_allowed{container=\"*\",namespace=\"default\",resource=\"memory\",unit=\"byte\",verticalpodautoscaler=\"metrics\"} 1.073741824e+09"), //nolint:lll
 			))
 		})
 
