@@ -2,13 +2,13 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-FROM golang:1.23 as builder
+FROM golang:1.25 as builder
 
 ENV GOTOOLCHAIN=local
 WORKDIR /workspace
 COPY . .
 ARG VERSION
-RUN CGO_ENABLED=0 GO_LDFLAGS="main.Version=${VERSION}" make build-all
+RUN CGO_ENABLED=0 GO_LDFLAGS="-X main.Version=${VERSION}" make build-all
 
 FROM gcr.io/distroless/static:nonroot
 LABEL source_repository="https://github.com/sapcc/vpa_butler"
