@@ -87,7 +87,8 @@ func main() {
 			BindAddress: ":8080",
 		},
 		Cache: cache.Options{
-			SyncPeriod: &syncPeriod,
+			SyncPeriod:       &syncPeriod,
+			DefaultTransform: cache.TransformStripManagedFields(),
 		},
 		HealthProbeBindAddress: ":8081",
 	})
