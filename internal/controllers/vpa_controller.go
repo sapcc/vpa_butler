@@ -358,12 +358,12 @@ func equalTarget(a, b *autoscalingv1.CrossVersionObjectReference) bool {
 	// vpa so v1 and apps/v1 work for deployments etc., so ignore
 	// the prefix if only one apiVersion has a prefix
 	apiEqual := false
-	aSplitted := strings.Split(a.APIVersion, "/")
-	bSplitted := strings.Split(b.APIVersion, "/")
-	if len(aSplitted) == len(bSplitted) {
+	aSplit := strings.Split(a.APIVersion, "/")
+	bSplit := strings.Split(b.APIVersion, "/")
+	if len(aSplit) == len(bSplit) {
 		apiEqual = a.APIVersion == b.APIVersion
 	} else {
-		apiEqual = aSplitted[len(aSplitted)-1] == bSplitted[len(bSplitted)-1]
+		apiEqual = aSplit[len(aSplit)-1] == bSplit[len(bSplit)-1]
 	}
 
 	return a.Name == b.Name &&
