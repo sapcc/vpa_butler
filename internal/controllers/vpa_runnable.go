@@ -148,7 +148,7 @@ func (v *VpaRunnable) reconcileMaxResource(ctx context.Context, target filter.Ta
 	} else {
 		largest = maxByMemory(viable)
 	}
-	err = v.patchMaxRessources(ctx, patchParams{
+	err = v.patchMaxResources(ctx, patchParams{
 		vpa: target.Vpa,
 		namedResources: distributionFunc(resourceDistributionParams{
 			target:          target,
@@ -168,7 +168,7 @@ type patchParams struct {
 	namedResources []common.NamedResourceList
 }
 
-func (v *VpaRunnable) patchMaxRessources(ctx context.Context, params patchParams) error {
+func (v *VpaRunnable) patchMaxResources(ctx context.Context, params patchParams) error {
 	vpa := params.vpa
 	if vpa.Spec.ResourcePolicy == nil || len(vpa.Spec.ResourcePolicy.ContainerPolicies) == 0 {
 		return fmt.Errorf("resource policy of vpa %s/%s is empty", vpa.Namespace, vpa.Name)

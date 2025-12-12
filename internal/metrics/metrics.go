@@ -68,13 +68,13 @@ func RecordContainerVpaMetrics(vpa *vpav1.VerticalPodAutoscaler) {
 			continue
 		}
 
-		excess := substractResources(recommendation.UncappedTarget, maxRecommendation)
+		excess := subtractResources(recommendation.UncappedTarget, maxRecommendation)
 		recordMetric(containerRecommendationExcess, labels, recommendation.ContainerName, "cpu", "core", excess.Cpu())
 		recordMetric(containerRecommendationExcess, labels, recommendation.ContainerName, "memory", "byte", excess.Memory())
 	}
 }
 
-func substractResources(minuend, subtrahend corev1.ResourceList) corev1.ResourceList {
+func subtractResources(minuend, subtrahend corev1.ResourceList) corev1.ResourceList {
 	result := make(corev1.ResourceList)
 	for k, v := range minuend {
 		if sub, ok := subtrahend[k]; ok {
