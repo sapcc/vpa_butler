@@ -7,6 +7,7 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -19,7 +20,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	vpav1 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1"
-	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/sapcc/vpa_butler/internal/common"
@@ -297,9 +297,9 @@ var _ = Describe("VpaController", func() {
 				data, err := io.ReadAll(res.Body)
 				Expect(err).To(Succeed())
 				lines := strings.Split(string(data), "\n")
-				excess := slices.Filter(nil, lines, func(s string) bool {
-					return strings.Contains(s, "vpa_butler_vpa_container_recommendation_excess{") ||
-						strings.Contains(s, "vpa_butler_vpa_container_max_allowed{")
+				excess := slices.DeleteFunc(lines, func(s string) bool {
+					return !strings.Contains(s, "vpa_butler_vpa_container_recommendation_excess{") &&
+						!strings.Contains(s, "vpa_butler_vpa_container_max_allowed{")
 				})
 				return excess
 			}).Should(SatisfyAll(
