@@ -4,11 +4,13 @@
 package filter
 
 import (
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	vpav1 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1"
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
+	"k8s.io/klog/v2"
 )
 
 func Schedulable(nodes []corev1.Node) []corev1.Node {
@@ -59,9 +61,11 @@ func TaintToleration(target TargetedVpa, nodes []corev1.Node) ([]corev1.Node, er
 	tolerated := make([]corev1.Node, 0)
 	for _, node := range nodes {
 		_, untolerated := v1helper.FindMatchingUntoleratedTaint(
+			klog.New(logr.Discard().GetSink()),
 			node.Spec.Taints,
 			target.PodSpec.Tolerations,
 			doNotScheduleTaintsFilterFunc,
+			true,
 		)
 		if !untolerated {
 			tolerated = append(tolerated, node)
