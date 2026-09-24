@@ -171,7 +171,7 @@ var _ = Describe("GenericController", func() {
 			ref := types.NamespacedName{Name: name, Namespace: metav1.NamespaceDefault}
 			var vpa vpav1.VerticalPodAutoscaler
 			Expect(k8sClient.Get(context.Background(), ref, &vpa)).To(Succeed())
-			Expect(vpa.Spec.UpdatePolicy.MinReplicas).To(Equal(ptr.To(int32(1))))
+			Expect(vpa.Spec.UpdatePolicy.MinReplicas).To(Equal(new(int32(1))))
 		})
 	})
 
