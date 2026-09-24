@@ -21,7 +21,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	vpav1 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -276,7 +275,7 @@ func (v *VpaController) configureVpa(vpaOwner replicatedObject, vpa *vpav1.Verti
 		autoModes := []vpav1.UpdateMode{vpav1.UpdateModeAuto, vpav1.UpdateModeRecreate}
 		if slices.Contains(autoModes, *vpa.Spec.UpdatePolicy.UpdateMode) {
 			if vpaOwner.replicas != nil && *vpaOwner.replicas <= 1 {
-				vpa.Spec.UpdatePolicy.MinReplicas = ptr.To(int32(1))
+				vpa.Spec.UpdatePolicy.MinReplicas = new(int32(1))
 			}
 		}
 	}
