@@ -10,7 +10,6 @@ import (
 	"github.com/sapcc/vpa_butler/internal/filter"
 
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var _ = Describe("Schedulable", func() {
@@ -126,7 +125,7 @@ var _ = Describe("NodeAffinity", func() {
 	It("keeps nodes if an affinity matches", func() {
 		Expect(filter.NodeAffinity(filter.TargetedVpa{PodSpec: corev1.PodSpec{
 			Affinity: affinity,
-		}}, []corev1.Node{{ObjectMeta: v1.ObjectMeta{Labels: map[string]string{"required": "yes"}}}})).To(HaveLen(1))
+		}}, []corev1.Node{{Labels: map[string]string{"required": "yes"}}})).To(HaveLen(1))
 	})
 
 })

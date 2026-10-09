@@ -107,9 +107,9 @@ func makeDeployment(replicas int32) *appsv1.Deployment {
 }
 
 func makeStatefulSet() *appsv1.StatefulSet {
-	statefulset := appsv1.StatefulSet{}
-	statefulset.Name = statefulSetName
-	statefulset.Namespace = metav1.NamespaceDefault
+	statefulset := appsv1.StatefulSet{
+		Name:      statefulSetName,
+		Namespace: metav1.NamespaceDefault}
 	statefulset.Spec.Selector = &selector
 	statefulset.Spec.Template.Labels = labels
 	statefulset.Spec.Replicas = ptr.To[int32](1)
