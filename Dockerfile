@@ -10,7 +10,7 @@ COPY . .
 ARG VERSION
 RUN CGO_ENABLED=0 GO_LDFLAGS="-X main.Version=${VERSION}" make build-all
 
-FROM gcr.io/distroless/static:nonroot
+FROM gcr.io/distroless/static:nonroot@sha256:8ce6dd87e9823c5b48dcfb2c8604714ccb351ce59607327bcc4957448da279b5
 LABEL source_repository="https://github.com/sapcc/vpa_butler"
 WORKDIR /
 COPY --from=builder /workspace/build/vpa_butler /vpa_butler
